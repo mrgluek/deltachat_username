@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -81,11 +82,20 @@ def get_config(key: str) -> Optional[str]:
 
 
 def get_admin_fingerprint() -> Optional[str]:
-    return get_config("admin_dc_fingerprint")
+    fp = get_config("admin_dc_fingerprint")
+    if fp:
+        cleaned = fp.strip().replace(" ", "").replace(":", "").upper()
+        if re.match(r"^[0-9A-F]{32,64}$", cleaned):
+            return cleaned
+    return None
 
 
 def set_admin_fingerprint(fp: str):
-    set_config("admin_dc_fingerprint", fp)
+    if fp:
+        cleaned = fp.strip().replace(" ", "").replace(":", "").upper()
+        set_config("admin_dc_fingerprint", cleaned)
+    else:
+        set_config("admin_dc_fingerprint", "")
 
 
 def get_username_claim(username: str) -> Optional[Dict[str, Any]]:

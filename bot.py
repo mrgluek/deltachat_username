@@ -6,6 +6,7 @@ import re
 import sys
 import threading
 from urllib.parse import parse_qs, urlparse
+from typing import Optional
 
 from deltachat2 import events, MsgData
 from deltabot_cli import BotCli
@@ -177,20 +178,78 @@ def _is_dc_admin(bot, accid: int, from_id: int) -> bool:
     return False
 
 
-def _get_contact_fingerprint(bot, accid: int, from_id: int, contact=None) -> str:
-    """Retrieve contact's cryptographic fingerprint from Delta Chat RPC."""
+def _get_contact_fingerprint(bot, accid: int, contact_id: int, contact=None) -> Optional[str]:
+    """Retrieve contact's cryptographic PGP fingerprint from Delta Chat RPC, filtering out bot self-fingerprints."""
+    self_fps = set()
     try:
-        if hasattr(bot.rpc, "get_contact_encryption_info"):
-            info = bot.rpc.get_contact_encryption_info(accid, from_id)
-            if isinstance(info, dict):
-                return info.get("fingerprint", "") or info.get("qr_code", "")
-            return str(info)
-        elif hasattr(bot.rpc, "get_contact"):
-            c = contact or bot.rpc.get_contact(accid, from_id)
-            return getattr(c, "fingerprint", "") or ""
+        bot_addrs = []
+        bot_addr = bot.rpc.get_config(accid, "addr")
+        if bot_addr:
+            bot_addrs.append(bot_addr.lower().strip())
+
+        try:
+            transports = bot.rpc.list_transports(accid)
+            for t in transports:
+                t_addr = t.get("addr", "") if isinstance(t, dict) else getattr(t, "addr", "")
+                if t_addr:
+                    bot_addrs.append(t_addr.lower().strip())
+        except Exception:
+            pass
+
+        if bot_addrs:
+            for args in [(accid, contact_id), (contact_id,)]:
+                try:
+                    enc_info_self = bot.rpc.get_contact_encryption_info(*args)
+                    if enc_info_self:
+                        blocks = re.split(r"\n\s*\n", enc_info_self.strip())
+                        for block in blocks:
+                            if any(a in block.lower() for a in bot_addrs):
+                                matches = re.findall(
+                                    r"[0-9a-fA-F]{32,64}", "".join(block.split()).replace(":", "")
+                                )
+                                self_fps.update(m.upper() for m in matches)
+                        break
+                except Exception:
+                    continue
+    except Exception as e:
+        bot.logger.error(f"Error detecting self-fingerprint: {e}")
+
+    # 1. Try directly from contact object if available
+    if contact:
+        get_val = getattr(contact, "get", lambda k: getattr(contact, k, None))
+        for attr in ["fingerprint", "key_fingerprint", "public_key"]:
+            val = get_val(attr)
+            if val:
+                matches = re.findall(r"[0-9a-fA-F]{32,64}", str(val).replace(" ", "").replace(":", ""))
+                valid_matches = [m.upper() for m in matches if m.upper() not in self_fps]
+                if valid_matches:
+                    return ",".join(valid_matches)
+
+    # 2. Try get_contact_config(accid, contact_id, "fp")
+    try:
+        fp = bot.rpc.get_contact_config(accid, contact_id, "fp")
+        if fp:
+            clean_fp = fp.upper().replace(" ", "").replace(":", "")
+            if clean_fp not in self_fps and re.match(r"^[0-9A-F]{32,64}$", clean_fp):
+                return clean_fp
     except Exception:
         pass
-    return ""
+
+    # 3. Try get_contact_encryption_info
+    for args in [(accid, contact_id), (contact_id,)]:
+        try:
+            enc_info = bot.rpc.get_contact_encryption_info(*args)
+            if enc_info:
+                cleaned_info = "".join(enc_info.split()).replace(":", "")
+                matches = re.findall(r"[0-9a-fA-F]{32,64}", cleaned_info)
+                valid_matches = [m.upper() for m in matches if m.upper() not in self_fps]
+                if valid_matches:
+                    return ",".join(valid_matches)
+        except Exception as e:
+            bot.logger.debug(f"get_contact_encryption_info{args} failed: {e}")
+            continue
+
+    return None
 
 
 def _dc_send_msg_with_stats(bot, accid: int, chat_id: int, msg_data: MsgData):
