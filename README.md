@@ -15,29 +15,44 @@ A Delta Chat bot and FastAPI web service for registering custom usernames and ge
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start & Deployment
 
-### Docker Compose (Recommended)
+### 1. Build Container
 
-1. Clone repository and navigate to `deltachat_username`:
-   ```bash
-   cd deltachat_username
-   ```
+Clone repository and navigate to `deltachat_username`:
+```bash
+cd deltachat_username
+cp .env.example .env
+docker compose build
+```
 
-2. Copy environment template:
-   ```bash
-   cp .env.example .env
-   ```
+### 2. Initialize Delta Chat Account
 
-3. Build and launch containers:
-   ```bash
-   docker compose up -d --build
-   ```
+Initialize the bot's email account (e.g. Chatmail or custom mail server):
 
-4. Claim administrative ownership in private chat:
-   ```text
-   /initadmin
-   ```
+```bash
+# For custom email server:
+docker compose run --rm username_bot python bot.py init usernamebot@yourdomain.com "your_password"
+
+# Or for automatic Chatmail account creation:
+docker compose run --rm username_bot python bot.py init usernamebot@chatmail.uk ""
+```
+
+### 3. (Optional) Pre-configure Admin Email / Fingerprint
+
+```bash
+docker compose run --rm username_bot python set_admin.py --email admin@yourdomain.com
+```
+
+### 4. Launch Bot Daemon
+
+```bash
+docker compose up -d
+```
+
+### 5. Claim Administrative Ownership
+
+Send `/initadmin` to the bot in a private message in Delta Chat to complete admin identity verification.
 
 ---
 

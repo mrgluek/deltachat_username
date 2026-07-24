@@ -328,7 +328,7 @@ def get_index_page():
 </head>
 <body>
     <div class="container">
-        header>
+        <header>
             <h1>🔗 Delta Chat Username Service</h1>
             <p class="subtitle">Short custom invite links for Delta Chat users and group chats</p>
             <span class="badge">Active Registered Usernames: {total_usernames}</span>
@@ -749,44 +749,41 @@ def transports_command(bot, accid, event):
     _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="\n".join(lines)))
 
 
-# --- MAIN RUNNER ---
+# --- LIFECYCLE HOOKS ---
 
 
 def run_fastapi(host: str = "0.0.0.0", port: int = 8080):
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 
-def main():
+@dc_cli.on_init
+def on_init(bot, _args):
     port = int(os.getenv("PORT", "8080"))
-
     web_thread = threading.Thread(target=run_fastapi, kwargs={"port": port}, daemon=True)
     web_thread.start()
 
-    def cache_bot_info():
+
+@dc_cli.on_start
+def on_start(bot, _args):
+    bot.logger.info("Delta Chat Username Bot is running.")
+    accounts = bot.rpc.get_all_account_ids()
+    if accounts:
+        accid = accounts[0]
         try:
-            accs = dc_cli.rpc.get_all_account_ids()
-            if accs:
-                accid = accs[0]
-                addr = dc_cli.rpc.get_config(accid, "addr") or ""
-                if addr:
-                    database.set_config("bot_addr", addr)
-                try:
-                    invite = dc_cli.rpc.get_invite_link(accid)
-                    if invite:
-                        database.set_config("bot_invite_url", invite)
-                except Exception:
-                    pass
+            addr = bot.rpc.get_config(accid, "configured_addr") or bot.rpc.get_config(accid, "addr") or ""
+            if addr:
+                database.set_config("bot_addr", addr)
+            invite = bot.rpc.get_invite_link(accid)
+            if invite:
+                database.set_config("bot_invite_url", invite)
         except Exception:
             pass
 
-    threading.Timer(5.0, cache_bot_info).start()
 
-    print(f"🚀 Delta Chat Username Bot & Web Service starting on port {port}...")
-    dc_cli.start()
+# --- MAIN RUNNER ---
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "serve":
-        main()
-    else:
-        main()
+    if len(sys.argv) == 1:
+        sys.argv.append("serve")
+    dc_cli.start()
