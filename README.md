@@ -80,6 +80,7 @@ python3 -m unittest discover -s tests -p "test_*.py" -v
 
 If you find this bot useful, consider supporting its development:
 
+- ⭐ **Star** this repository or bookmark it!
 - **Git Repository:** [mrgluek/deltachat_username](https://github.com/mrgluek/deltachat_username)
 - **Forgejo Mirror:** [gluek/deltachat_username](https://git.gluek.info/gluek/deltachat_username)
 - **Donations:**
