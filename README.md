@@ -28,14 +28,14 @@ docker compose build
 
 ### 2. Initialize Delta Chat Account
 
-Initialize the bot's email account (e.g. Chatmail or custom mail server):
+Initialize the bot's account in Delta Chat CLI (`deltabot-cli`):
 
 ```bash
-# For custom email server:
-docker compose run --rm username_bot python bot.py init usernamebot@yourdomain.com "your_password"
+# Option A: Automatic setup on a Chatmail server (e.g. chatmail.uk or nine.testrun.org)
+docker compose run --rm username_bot python bot.py init usernamebot@chatmail.uk
 
-# Or for automatic Chatmail account creation:
-docker compose run --rm username_bot python bot.py init usernamebot@chatmail.uk ""
+# Option B: Standard email account with password
+docker compose run --rm username_bot python bot.py init usernamebot@yourdomain.com "your_password"
 ```
 
 ### 3. (Optional) Pre-configure Admin Email / Fingerprint
