@@ -535,7 +535,6 @@ def initadmin_command(bot, accid, event):
     admin_email = database.get_config("admin_dc_email")
     admin_fp = database.get_admin_fingerprint()
 
-    # If both admin email and fingerprint are set, block re-initialization
     if admin_email and admin_fp:
         _dc_send_msg_with_stats(
             bot,
@@ -548,7 +547,6 @@ def initadmin_command(bot, accid, event):
     contact = bot.rpc.get_contact(accid, msg.from_id)
     sender_email = (contact.address or "").strip()
 
-    # If admin email was pre-configured (e.g. via set_admin.py --email)
     if admin_email:
         if sender_email.lower() != admin_email.lower():
             _dc_send_msg_with_stats(
@@ -564,7 +562,6 @@ def initadmin_command(bot, accid, event):
         database.set_config("admin_dc_email", sender_email)
         admin_email = sender_email
 
-    # Bind fingerprint if available
     fp = _get_contact_fingerprint(bot, accid, msg.from_id, contact=contact)
     if fp:
         first_fp = fp.split(",")[0].strip().upper()
@@ -646,13 +643,11 @@ def username_command(bot, accid, event):
     # --- SCENARIO B: CLAIM OR UPDATE USERNAME ---
     target_username = raw_payload.lower()
 
-    # Step 1: Validation
     valid, err_msg = validate_username_format(target_username)
     if not valid:
         _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ {err_msg}"))
         return
 
-    # Step 2: Check Availability
     existing_claim = database.get_username_claim(target_username)
     if existing_claim and str(existing_claim["claimed_by_chat_id"]) != str(msg.chat_id):
         _dc_send_msg_with_stats(
@@ -663,9 +658,7 @@ def username_command(bot, accid, event):
         )
         return
 
-    # Step 3: Binding
     if is_group:
-        # Group Chat: Automatically get bot's invite link for this group chat
         try:
             invite_url = bot.rpc.get_chat_invite_url(accid, msg.chat_id)
         except Exception as e:
@@ -682,7 +675,6 @@ def username_command(bot, accid, event):
             MsgData(text=f"Done! This group chat's invite link is now:\n{base_url}/{target_username}"),
         )
     else:
-        # Private Chat: Reserve username in pending state and ask user for invite link
         database.set_pending_username(msg.chat_id, target_username)
         _dc_send_msg_with_stats(
             bot,
@@ -700,7 +692,6 @@ def on_new_message(bot, accid, event):
     if msg.is_info:
         return
 
-    # Track received stats & auto-upgrade admin fingerprint if matching email
     try:
         addr = bot.rpc.get_config(accid, "configured_addr") or bot.rpc.get_config(accid, "addr")
         if addr:
@@ -719,7 +710,6 @@ def on_new_message(bot, accid, event):
     if invite_url:
         pending_username = database.get_pending_username(msg.chat_id)
         if not pending_username:
-            # Check if user already has a claimed username, allowing quick link update
             current_claim = database.get_username_by_chat(msg.chat_id)
             if current_claim:
                 pending_username = current_claim["username"]
@@ -744,7 +734,6 @@ def on_new_message(bot, accid, event):
             )
             return
 
-        # Save claimed username mapping
         database.claim_username(pending_username, invite_url, msg.chat_id)
         database.clear_pending_username(msg.chat_id)
 
@@ -823,6 +812,119 @@ def transports_command(bot, accid, event):
         lines.append(f"• `{addr}` — Sent: {sent}, Recv: {recv}")
 
     _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="\n".join(lines)))
+
+
+@dc_cli.on(events.NewMessage(command="/addtransport"))
+def addtransport_command(bot, accid, event):
+    msg = event.msg
+    if not _is_dc_admin(bot, accid, msg.from_id):
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="❌ This command is only for the administrator."))
+        return
+
+    payload = event.payload.strip()
+    if not payload:
+        _dc_send_msg_with_stats(
+            bot,
+            accid,
+            msg.chat_id,
+            MsgData(
+                text="Usage:\n"
+                "/addtransport DCACCOUNT:server.example\n"
+                "/addtransport user@example.com password123"
+            ),
+        )
+        return
+
+    try:
+        if payload.startswith("DCACCOUNT:"):
+            bot.rpc.add_transport_from_qr(accid, payload)
+            _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="✅ Backup transport added via chatmail URI."))
+        else:
+            parts = payload.split(None, 1)
+            if len(parts) < 2:
+                _dc_send_msg_with_stats(
+                    bot,
+                    accid,
+                    msg.chat_id,
+                    MsgData(
+                        text="❌ For email accounts, provide both address and password:\n"
+                        "/addtransport user@example.com password123"
+                    ),
+                )
+                return
+            addr, password = parts[0], parts[1]
+            bot.rpc.add_or_update_transport(accid, {"addr": addr, "password": password})
+            _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"✅ Backup transport `{addr}` added."))
+    except Exception as e:
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ Failed to add transport: {e}"))
+
+
+@dc_cli.on(events.NewMessage(command="/rmtransport"))
+def rmtransport_command(bot, accid, event):
+    msg = event.msg
+    if not _is_dc_admin(bot, accid, msg.from_id):
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="❌ This command is only for the administrator."))
+        return
+
+    addr = event.payload.strip()
+    if not addr:
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="Usage: /rmtransport user@example.com"))
+        return
+
+    try:
+        transports = bot.rpc.list_transports(accid)
+        transport_addrs = [t.get("addr", "") if isinstance(t, dict) else getattr(t, "addr", "") for t in transports]
+        if len(transport_addrs) <= 1:
+            _dc_send_msg_with_stats(
+                bot, accid, msg.chat_id, MsgData(text="❌ Cannot remove the last transport. Add another one first.")
+            )
+            return
+        if addr not in transport_addrs:
+            _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ Transport `{addr}` not found."))
+            return
+
+        bot.rpc.delete_transport(accid, addr)
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"✅ Transport `{addr}` removed."))
+    except Exception as e:
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ Failed to remove transport: {e}"))
+
+
+@dc_cli.on(events.NewMessage(command="/setprimary"))
+def setprimary_command(bot, accid, event):
+    msg = event.msg
+    if not _is_dc_admin(bot, accid, msg.from_id):
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="❌ This command is only for the administrator."))
+        return
+
+    addr = event.payload.strip()
+    if not addr:
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="Usage: /setprimary user@example.com"))
+        return
+
+    try:
+        transports = bot.rpc.list_transports(accid)
+        transport_addrs = [t.get("addr", "") if isinstance(t, dict) else getattr(t, "addr", "") for t in transports]
+        if addr not in transport_addrs:
+            _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ Transport `{addr}` not found."))
+            return
+
+        bot.rpc.set_config(accid, "configured_addr", addr)
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"✅ Primary SMTP transport switched to `{addr}`."))
+    except Exception as e:
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ Failed to set primary transport: {e}"))
+
+
+@dc_cli.on(events.NewMessage(command="/resilient"))
+def resilient_command(bot, accid, event):
+    msg = event.msg
+    if not _is_dc_admin(bot, accid, msg.from_id):
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="❌ This command is only for the administrator."))
+        return
+    resilient = database.get_config("resilient_mode") == "1"
+    new_state = "0" if resilient else "1"
+    database.set_config("resilient_mode", new_state)
+    status_str = "ENABLED (using all available relays)" if new_state == "1" else "DISABLED (using primary relay)"
+    _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"✅ Resilient sending mode is now: **{status_str}**"))
 
 
 # --- LIFECYCLE HOOKS ---
