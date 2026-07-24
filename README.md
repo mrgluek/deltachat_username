@@ -76,6 +76,13 @@ python3 -m unittest discover -s tests -p "test_*.py" -v
 
 ---
 
-## 📄 License
+## ❤️ Support & Development
 
-MIT License.
+If you find this bot useful, consider supporting its development:
+
+- **Git Repository:** [mrgluek/deltachat_username](https://github.com/mrgluek/deltachat_username)
+- **Forgejo Mirror:** [gluek/deltachat_username](https://git.gluek.info/gluek/deltachat_username)
+- **Donations:**
+  - ☕️ [Ko-fi](https://ko-fi.com/gluek) (world cards, PayPal)
+  - 🚀 [Tribute](https://web.tribute.tg/d/IWb) (Russian cards, SBP)
+  - Or use the `/donate` command in Delta Chat.
