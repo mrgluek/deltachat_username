@@ -20,6 +20,7 @@ A Delta Chat bot and FastAPI web service for registering custom usernames and ge
 ### 1. Build Container
 
 Clone repository and navigate to `deltachat_username`:
+
 ```bash
 cd deltachat_username
 cp .env.example .env
@@ -96,8 +97,8 @@ python3 -m unittest discover -s tests -p "test_*.py" -v
 If you find this bot useful, consider supporting its development:
 
 - ⭐ **Star** this repository or bookmark it!
-- **Git Repository:** [mrgluek/deltachat_username](https://github.com/mrgluek/deltachat_username)
-- **Forgejo Mirror:** [gluek/deltachat_username](https://git.gluek.info/gluek/deltachat_username)
+  - **Git Repository:** [mrgluek/deltachat_username](https://github.com/mrgluek/deltachat_username)
+  - **Forgejo Mirror:** [gluek/deltachat_username](https://git.gluek.info/gluek/deltachat_username)
 - **Donations:**
   - ☕️ [Ko-fi](https://ko-fi.com/gluek) (world cards, PayPal)
   - 🚀 [Tribute](https://web.tribute.tg/d/IWb) (Russian cards, SBP)
