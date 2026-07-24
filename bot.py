@@ -20,6 +20,8 @@ try:
 except ImportError:
     qrcode = None
 
+VERSION = "1.0.0"
+
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
 
@@ -419,7 +421,7 @@ def get_help_text(bot, accid: int, from_id: int) -> str:
     base_url = database.get_config("base_url") or BASE_URL
 
     help_text = (
-        f"🤖 **Delta Chat Username Bot**\n\n"
+        f"🤖 **Delta Chat Username Bot v{VERSION}**\n\n"
         f"Claim short invite links for your profile or group chat! (`{base_url}/<username>`)\n\n"
         f"**Commands:**\n"
         f"/username — Check your current registered username\n"
@@ -765,19 +767,51 @@ def on_init(bot, _args):
 
 @dc_cli.on_start
 def on_start(bot, _args):
-    bot.logger.info("Delta Chat Username Bot is running.")
+    bot.logger.info(f"🚀 Delta Chat Username Bot v{VERSION} is now fully running. Waiting for events...")
     accounts = bot.rpc.get_all_account_ids()
     if accounts:
         accid = accounts[0]
+
+        admin_email = database.get_config("admin_dc_email")
+        admin_fp = database.get_admin_fingerprint()
+        if admin_email:
+            fp_suffix = f" ({admin_fp[-8:].upper()})" if admin_fp else ""
+            print(f"👑 Bot Administrator: {admin_email}{fp_suffix}")
+
         try:
             addr = bot.rpc.get_config(accid, "configured_addr") or bot.rpc.get_config(accid, "addr") or ""
             if addr:
                 database.set_config("bot_addr", addr)
-            invite = bot.rpc.get_invite_link(accid)
-            if invite:
-                database.set_config("bot_invite_url", invite)
         except Exception:
             pass
+
+        try:
+            transports = bot.rpc.list_transports(accid)
+            print("\n" + "=" * 50)
+            print("📡 Configured Bot Transports (Relays):")
+            for t in transports:
+                t_addr = t.get("addr", "") if isinstance(t, dict) else getattr(t, "addr", "")
+                print(f" - {t_addr}")
+        except Exception:
+            pass
+
+        try:
+            qrdata = bot.rpc.get_chat_securejoin_qr_code(accid, None)
+            database.set_config("bot_invite_url", qrdata)
+            print("\nTo add this bot, scan the QR code or copy the link below:\n")
+
+            if qrcode:
+                qr = qrcode.QRCode(version=1, box_size=1, border=2)
+                qr.add_data(qrdata)
+                qr.make(fit=True)
+                f = io.StringIO()
+                qr.print_ascii(out=f)
+                print(f.getvalue())
+
+            print(qrdata)
+            print("\n" + "=" * 50 + "\n")
+        except Exception as e:
+            bot.logger.error(f"Failed to generate QR code: {e}")
 
 
 # --- MAIN RUNNER ---
