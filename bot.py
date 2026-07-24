@@ -31,6 +31,52 @@ BASE_URL = os.getenv("BASE_URL", "https://d.gluek.info").rstrip("/")
 # --- HELPER FUNCTIONS ---
 
 
+def configure_bot_profile(bot, accid: int):
+    """Configure bot display name, status text, and avatar icon from environment or default files."""
+    try:
+        bot_name = os.environ.get("DISPLAY_NAME", "Username Bot")
+        bot.rpc.set_config(accid, "displayname", bot_name)
+    except Exception as e:
+        bot.logger.warning(f"Failed to set displayname: {e}")
+
+    try:
+        status_text = os.environ.get(
+            "STATUS_TEXT",
+            "Short custom invite link service for Delta Chat: https://d.gluek.info",
+        )
+        bot.rpc.set_config(accid, "selfstatus", status_text)
+    except Exception as e:
+        bot.logger.warning(f"Failed to set selfstatus: {e}")
+
+    try:
+        avatar_env = os.environ.get("AVATAR_PATH")
+        avatar_paths = []
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+        if avatar_env:
+            if os.path.isabs(avatar_env):
+                avatar_paths.append(avatar_env)
+            else:
+                avatar_paths.append(os.path.join(base_dir, avatar_env))
+                avatar_paths.append(os.path.abspath(avatar_env))
+
+        avatar_paths.extend(
+            [
+                os.path.join(base_dir, "icon.png"),
+                os.path.join(base_dir, "icon.jpg"),
+                os.path.join(base_dir, "icon.jpeg"),
+            ]
+        )
+
+        for path in avatar_paths:
+            if os.path.exists(path):
+                bot.rpc.set_config(accid, "selfavatar", path)
+                bot.logger.info(f"Avatar set from {path}")
+                break
+    except Exception as e:
+        bot.logger.warning(f"Failed to set selfavatar: {e}")
+
+
 def is_group_chat(chat) -> bool:
     """Check whether a chat object or dict represents a group chat."""
     if isinstance(chat, dict):
@@ -764,6 +810,10 @@ def on_init(bot, _args):
     web_thread = threading.Thread(target=run_fastapi, kwargs={"port": port}, daemon=True)
     web_thread.start()
 
+    accounts = bot.rpc.get_all_account_ids()
+    for accid in accounts:
+        configure_bot_profile(bot, accid)
+
 
 @dc_cli.on_start
 def on_start(bot, _args):
@@ -771,6 +821,7 @@ def on_start(bot, _args):
     accounts = bot.rpc.get_all_account_ids()
     if accounts:
         accid = accounts[0]
+        configure_bot_profile(bot, accid)
 
         admin_email = database.get_config("admin_dc_email")
         admin_fp = database.get_admin_fingerprint()
