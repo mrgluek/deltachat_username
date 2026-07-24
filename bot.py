@@ -79,65 +79,61 @@ def configure_bot_profile(bot, accid: int):
 
 
 def is_group_chat(bot, accid: int, chat_id: int) -> bool:
-    """Determine if a chat is a group chat using multiple Delta Chat RPC checks."""
+    """
+    Determine if a chat is a group chat using Delta Chat RPC basic info,
+    full chat info, and chat contacts fallback. Matches standard implementation across all repository bots.
+    """
+    # 1. Primary check: get_basic_chat_info
     try:
         chat_info = bot.rpc.get_basic_chat_info(accid, chat_id)
-        if isinstance(chat_info, dict):
-            c_type = chat_info.get("chatType") or chat_info.get("chat_type") or chat_info.get("type")
-            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
-                return True
-            if c_type in (100, 120, 130, "100", "120", "130"):
-                return True
-            if isinstance(c_type, str) and c_type.lower() == "single":
-                return False
-            if c_type in (1, "1"):
-                return False
-        elif chat_info:
-            c_type = (
-                getattr(chat_info, "chat_type", None)
-                or getattr(chat_info, "chatType", None)
-                or getattr(chat_info, "type", None)
-            )
-            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
-                return True
-            if c_type in (100, 120, 130, "100", "120", "130"):
-                return True
-            if isinstance(c_type, str) and c_type.lower() == "single":
-                return False
-            if c_type in (1, "1"):
-                return False
-    except Exception:
-        pass
+        if chat_info:
+            if isinstance(chat_info, dict):
+                chat_type = chat_info.get("chat_type") or chat_info.get("chatType")
+                type_val = chat_info.get("type")
+            else:
+                chat_type = getattr(chat_info, "chat_type", None) or getattr(chat_info, "chatType", None)
+                type_val = getattr(chat_info, "type", None)
 
+            if chat_type is not None:
+                if str(chat_type).lower() in ("group", "verifiedgroup", "channel"):
+                    return True
+                if str(chat_type).lower() == "single":
+                    return False
+
+            if type_val is not None:
+                if str(type_val) in ("100", "120", "130"):
+                    return True
+                if str(type_val) in ("1", "single"):
+                    return False
+    except Exception as e:
+        bot.logger.debug(f"get_basic_chat_info failed for chat {chat_id}: {e}")
+
+    # 2. Secondary check: get_full_chat_by_id
     try:
         chat_info = bot.rpc.get_full_chat_by_id(accid, chat_id)
-        if isinstance(chat_info, dict):
-            c_type = chat_info.get("chatType") or chat_info.get("chat_type") or chat_info.get("type")
-            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
-                return True
-            if c_type in (100, 120, 130, "100", "120", "130"):
-                return True
-            if isinstance(c_type, str) and c_type.lower() == "single":
-                return False
-            if c_type in (1, "1"):
-                return False
-        elif chat_info:
-            c_type = (
-                getattr(chat_info, "chat_type", None)
-                or getattr(chat_info, "chatType", None)
-                or getattr(chat_info, "type", None)
-            )
-            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
-                return True
-            if c_type in (100, 120, 130, "100", "120", "130"):
-                return True
-            if isinstance(c_type, str) and c_type.lower() == "single":
-                return False
-            if c_type in (1, "1"):
-                return False
-    except Exception:
-        pass
+        if chat_info:
+            if isinstance(chat_info, dict):
+                chat_type = chat_info.get("chat_type") or chat_info.get("chatType")
+                type_val = chat_info.get("type")
+            else:
+                chat_type = getattr(chat_info, "chat_type", None) or getattr(chat_info, "chatType", None)
+                type_val = getattr(chat_info, "type", None)
 
+            if chat_type is not None:
+                if str(chat_type).lower() in ("group", "verifiedgroup", "channel"):
+                    return True
+                if str(chat_type).lower() == "single":
+                    return False
+
+            if type_val is not None:
+                if str(type_val) in ("100", "120", "130"):
+                    return True
+                if str(type_val) in ("1", "single"):
+                    return False
+    except Exception as e:
+        bot.logger.debug(f"get_full_chat_by_id failed for chat {chat_id}: {e}")
+
+    # 3. Tertiary fallback: get_chat_contacts length check
     try:
         contacts = bot.rpc.get_chat_contacts(accid, chat_id)
         if isinstance(contacts, list):
@@ -145,8 +141,8 @@ def is_group_chat(bot, accid: int, chat_id: int) -> bool:
                 return True
             if len(contacts) == 1:
                 return False
-    except Exception:
-        pass
+    except Exception as e:
+        bot.logger.debug(f"get_chat_contacts failed for chat {chat_id}: {e}")
 
     return False
 
