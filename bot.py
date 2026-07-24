@@ -469,7 +469,7 @@ def get_index_page():
         </div>
 
         <footer>
-            Powered by <a href="https://delta.chat" target="_blank">Delta Chat</a> &bull; Short links format: <code>{base_url}/&lt;username&gt;</code>
+            Powered by <a href="https://github.com/mrgluek/deltachat_username" target="_blank">Delta Chat Username Bot</a> (<a href="https://git.gluek.info/gluek/deltachat_username" target="_blank">Mirror</a>) &bull; Short links format: <code>{base_url}/&lt;username&gt;</code>
         </footer>
     </div>
 </body>
