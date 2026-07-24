@@ -78,22 +78,77 @@ def configure_bot_profile(bot, accid: int):
         bot.logger.warning(f"Failed to set selfavatar: {e}")
 
 
-def is_group_chat(chat) -> bool:
-    """Check whether a chat object or dict represents a group chat."""
-    if isinstance(chat, dict):
-        t = chat.get("type")
-        if t is not None:
-            return t != 1
-        ct = chat.get("chat_type")
-        if ct is not None:
-            return str(ct) != "Single"
-        return False
-    else:
-        t = getattr(chat, "type", None)
-        if t is not None:
-            return t != 1
-        ct = getattr(chat, "chat_type", "Single")
-        return str(ct) != "Single"
+def is_group_chat(bot, accid: int, chat_id: int) -> bool:
+    """Determine if a chat is a group chat using multiple Delta Chat RPC checks."""
+    try:
+        chat_info = bot.rpc.get_basic_chat_info(accid, chat_id)
+        if isinstance(chat_info, dict):
+            c_type = chat_info.get("chatType") or chat_info.get("chat_type") or chat_info.get("type")
+            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
+                return True
+            if c_type in (100, 120, 130, "100", "120", "130"):
+                return True
+            if isinstance(c_type, str) and c_type.lower() == "single":
+                return False
+            if c_type in (1, "1"):
+                return False
+        elif chat_info:
+            c_type = (
+                getattr(chat_info, "chat_type", None)
+                or getattr(chat_info, "chatType", None)
+                or getattr(chat_info, "type", None)
+            )
+            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
+                return True
+            if c_type in (100, 120, 130, "100", "120", "130"):
+                return True
+            if isinstance(c_type, str) and c_type.lower() == "single":
+                return False
+            if c_type in (1, "1"):
+                return False
+    except Exception:
+        pass
+
+    try:
+        chat_info = bot.rpc.get_full_chat_by_id(accid, chat_id)
+        if isinstance(chat_info, dict):
+            c_type = chat_info.get("chatType") or chat_info.get("chat_type") or chat_info.get("type")
+            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
+                return True
+            if c_type in (100, 120, 130, "100", "120", "130"):
+                return True
+            if isinstance(c_type, str) and c_type.lower() == "single":
+                return False
+            if c_type in (1, "1"):
+                return False
+        elif chat_info:
+            c_type = (
+                getattr(chat_info, "chat_type", None)
+                or getattr(chat_info, "chatType", None)
+                or getattr(chat_info, "type", None)
+            )
+            if isinstance(c_type, str) and c_type.lower() in ("group", "verifiedgroup", "channel"):
+                return True
+            if c_type in (100, 120, 130, "100", "120", "130"):
+                return True
+            if isinstance(c_type, str) and c_type.lower() == "single":
+                return False
+            if c_type in (1, "1"):
+                return False
+    except Exception:
+        pass
+
+    try:
+        contacts = bot.rpc.get_chat_contacts(accid, chat_id)
+        if isinstance(contacts, list):
+            if len(contacts) > 1:
+                return True
+            if len(contacts) == 1:
+                return False
+    except Exception:
+        pass
+
+    return False
 
 
 def validate_username_format(username: str) -> tuple[bool, str]:
@@ -663,12 +718,7 @@ def username_command(bot, accid, event):
     base_url = database.get_config("base_url") or BASE_URL
     raw_payload = event.payload.strip()
 
-    try:
-        chat = bot.rpc.get_chat(accid, msg.chat_id)
-    except Exception:
-        chat = {}
-
-    is_group = is_group_chat(chat)
+    is_group = is_group_chat(bot, accid, msg.chat_id)
 
     # --- SCENARIO A: CHECK CURRENT STATUS ---
     if not raw_payload:
@@ -732,7 +782,7 @@ def username_command(bot, accid, event):
 
     if is_group:
         try:
-            invite_url = bot.rpc.get_chat_invite_url(accid, msg.chat_id)
+            invite_url = bot.rpc.get_chat_securejoin_qr_code(accid, msg.chat_id)
         except Exception as e:
             _dc_send_msg_with_stats(
                 bot, accid, msg.chat_id, MsgData(text=f"❌ Could not generate group invite link: {e}")
