@@ -22,7 +22,6 @@ class TestUsernameBot(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self):
-        # Clean up database tables
         conn = database.get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM usernames")
@@ -32,17 +31,14 @@ class TestUsernameBot(unittest.TestCase):
         conn.close()
 
     def test_username_validation(self):
-        # Too short (< 5 chars)
         valid, msg = validate_username_format("alex")
         self.assertFalse(valid)
         self.assertIn("shorter than 5 characters", msg)
 
-        # Invalid characters
         valid, msg = validate_username_format("user@name")
         self.assertFalse(valid)
         self.assertIn("only contain letters", msg)
 
-        # Valid usernames
         valid, msg = validate_username_format("gluek")
         self.assertTrue(valid)
         valid, msg = validate_username_format("my_group_123")
@@ -56,11 +52,9 @@ class TestUsernameBot(unittest.TestCase):
         )
         self.assertTrue(validate_invite_link(valid_link))
 
-        # Missing parameters
         invalid_link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39"
         self.assertFalse(validate_invite_link(invalid_link))
 
-        # Wrong domain
         wrong_domain = "https://example.com/#v=3&i=1&s=2&a=test&n=test"
         self.assertFalse(validate_invite_link(wrong_domain))
 
@@ -79,7 +73,6 @@ class TestUsernameBot(unittest.TestCase):
         self.assertEqual(claim["invite_link"], link)
         self.assertEqual(claim["claimed_by_chat_id"], "chat_100")
 
-        # Test query by chat_id
         chat_claim = database.get_username_by_chat("chat_100")
         self.assertIsNotNone(chat_claim)
         self.assertEqual(chat_claim["username"], "gluek")
@@ -88,26 +81,21 @@ class TestUsernameBot(unittest.TestCase):
         database.set_pending_username("chat_200", "myusername")
         self.assertEqual(database.get_pending_username("chat_200"), "myusername")
 
-        # Simulate timeout (> 600s)
         pending = database.get_pending_username("chat_200", ttl_seconds=-1)
         self.assertIsNone(pending)
 
     def test_fastapi_endpoints(self):
-        # GET / (Landing page)
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
         self.assertIn("Delta Chat Username Service", res.text)
 
-        # GET /health
         res = self.client.get("/health")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["status"], "ok")
 
-        # GET /{username} 404 for unknown user
         res = self.client.get("/nonexistent")
         self.assertEqual(res.status_code, 404)
 
-        # Claim username and test GET /{username} 307 Redirect
         link = "https://i.delta.chat/#ABC12345?v=3&i=1&s=2&a=test&n=test"
         database.claim_username("gluek", link, "chat_100")
 

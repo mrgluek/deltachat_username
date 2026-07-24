@@ -157,6 +157,12 @@ def _is_dc_admin(bot, accid: int, from_id: int) -> bool:
     try:
         contact = bot.rpc.get_contact(accid, from_id)
         if admin_email and contact.address and contact.address.lower() == admin_email.lower():
+            # Auto-upgrade: if fingerprint became available after initial email setup, save it now!
+            if not admin_fp:
+                fp = _get_contact_fingerprint(bot, accid, from_id, contact=contact)
+                if fp:
+                    first_fp = fp.split(",")[0].strip().upper()
+                    database.set_admin_fingerprint(first_fp)
             return True
     except Exception:
         pass
@@ -477,9 +483,10 @@ def get_help_text(bot, accid: int, from_id: int) -> str:
     )
 
     is_actually_admin = _is_dc_admin(bot, accid, from_id)
-    if not admin_email:
-        help_text += f"**Initialisation Command:**\n" f"/initadmin — Claim bot ownership (if no admin is set)\n\n"
-    elif is_actually_admin:
+    if not admin_email or not database.get_admin_fingerprint():
+        help_text += f"**Initialisation Command:**\n" f"/initadmin — Claim bot ownership or link admin fingerprint\n\n"
+
+    if is_actually_admin:
         admin_fp = database.get_admin_fingerprint()
         fp_suffix = f" ({admin_fp[-8:].upper()})" if admin_fp else ""
         help_text += f"👑 **Admin:** `{admin_email}`{fp_suffix}\n\n"
@@ -528,7 +535,8 @@ def initadmin_command(bot, accid, event):
     admin_email = database.get_config("admin_dc_email")
     admin_fp = database.get_admin_fingerprint()
 
-    if admin_email or admin_fp:
+    # If both admin email and fingerprint are set, block re-initialization
+    if admin_email and admin_fp:
         _dc_send_msg_with_stats(
             bot,
             accid,
@@ -538,18 +546,36 @@ def initadmin_command(bot, accid, event):
         return
 
     contact = bot.rpc.get_contact(accid, msg.from_id)
-    email = contact.address
-    database.set_config("admin_dc_email", email)
+    sender_email = (contact.address or "").strip()
 
+    # If admin email was pre-configured (e.g. via set_admin.py --email)
+    if admin_email:
+        if sender_email.lower() != admin_email.lower():
+            _dc_send_msg_with_stats(
+                bot,
+                accid,
+                msg.chat_id,
+                MsgData(
+                    text=f"❌ Admin email is configured as `{admin_email}`. Only messages sent from this email address can link the admin identity."
+                ),
+            )
+            return
+    else:
+        database.set_config("admin_dc_email", sender_email)
+        admin_email = sender_email
+
+    # Bind fingerprint if available
     fp = _get_contact_fingerprint(bot, accid, msg.from_id, contact=contact)
     if fp:
-        first_fp = fp.split(",")[0]
+        first_fp = fp.split(",")[0].strip().upper()
         database.set_admin_fingerprint(first_fp)
         _dc_send_msg_with_stats(
             bot,
             accid,
             msg.chat_id,
-            MsgData(text=f"✅ You are now the admin!\n\nEmail: `{email}`\nFingerprint: `{first_fp[-8:]}`"),
+            MsgData(
+                text=f"✅ You are now confirmed as admin!\n\nEmail: `{admin_email}`\nFingerprint: `{first_fp[-8:]}`"
+            ),
         )
     else:
         _dc_send_msg_with_stats(
@@ -557,7 +583,7 @@ def initadmin_command(bot, accid, event):
             accid,
             msg.chat_id,
             MsgData(
-                text=f"✅ You are now the admin!\n\nEmail: `{email}`\n⚠️ Fingerprint not available yet (will be used after key exchange)."
+                text=f"✅ Email confirmed as admin: `{admin_email}`\n⚠️ Fingerprint not available yet (will be linked after key exchange)."
             ),
         )
 
@@ -674,13 +700,15 @@ def on_new_message(bot, accid, event):
     if msg.is_info:
         return
 
-    # Track received stats
+    # Track received stats & auto-upgrade admin fingerprint if matching email
     try:
         addr = bot.rpc.get_config(accid, "configured_addr") or bot.rpc.get_config(accid, "addr")
         if addr:
             database.increment_transport_received(addr)
     except Exception:
         pass
+
+    _is_dc_admin(bot, accid, msg.from_id)
 
     text = (msg.text or "").strip()
     if not text or text.startswith("/"):
