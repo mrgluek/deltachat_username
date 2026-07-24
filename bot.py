@@ -11,7 +11,7 @@ from typing import Optional
 from deltachat2 import events, MsgData
 from deltabot_cli import BotCli
 from fastapi import FastAPI, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 import uvicorn
 
 import database
@@ -283,6 +283,18 @@ def generate_qr_data_uri(text: str) -> str:
 # --- FASTAPI WEB ENDPOINTS ---
 
 
+@app.get("/favicon.ico")
+def get_favicon():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    fav_path = os.path.join(base_dir, "favicon.ico")
+    if os.path.exists(fav_path):
+        return FileResponse(fav_path, media_type="image/x-icon")
+    icon_path = os.path.join(base_dir, "icon.png")
+    if os.path.exists(icon_path):
+        return FileResponse(icon_path, media_type="image/png")
+    return Response(status_code=404)
+
+
 @app.get("/", response_class=HTMLResponse)
 def get_index_page():
     base_url = database.get_config("base_url") or BASE_URL
@@ -320,6 +332,7 @@ def get_index_page():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delta Chat Username & Short Link Service</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         :root {{
             --bg-color: #0f172a;
