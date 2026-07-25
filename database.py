@@ -130,6 +130,8 @@ def claim_username(username: str, invite_link: str, chat_id: str) -> Dict[str, A
     with _lock:
         conn = get_connection()
         cursor = conn.cursor()
+        # Remove any previous username claimed by this chat (enforces 1 username max per chat)
+        cursor.execute("DELETE FROM usernames WHERE claimed_by_chat_id = ?", (str_chat_id,))
         cursor.execute(
             """
             INSERT INTO usernames (username, invite_link, claimed_by_chat_id, updated_at)
@@ -150,6 +152,35 @@ def claim_username(username: str, invite_link: str, chat_id: str) -> Dict[str, A
         "claimed_by_chat_id": str_chat_id,
         "updated_at": now_iso,
     }
+
+
+def unlink_username(username: str) -> bool:
+    clean_username = username.strip().lower()
+    with _lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM usernames WHERE username = ?", (clean_username,))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return deleted
+
+
+def unlink_chat_username(chat_id: str) -> Optional[str]:
+    str_chat_id = str(chat_id)
+    with _lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM usernames WHERE claimed_by_chat_id = ?", (str_chat_id,))
+        row = cursor.fetchone()
+        if row:
+            unbound_uname = row[0]
+            cursor.execute("DELETE FROM usernames WHERE claimed_by_chat_id = ?", (str_chat_id,))
+            conn.commit()
+            conn.close()
+            return unbound_uname
+        conn.close()
+        return None
 
 
 def set_pending_username(chat_id: str, username: str):

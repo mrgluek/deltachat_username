@@ -31,16 +31,20 @@ class TestUsernameBot(unittest.TestCase):
         conn.close()
 
     def test_username_validation(self):
-        valid, msg = validate_username_format("alex")
+        valid, msg = validate_username_format("ab")
         self.assertFalse(valid)
-        self.assertIn("shorter than 5 characters", msg)
+        self.assertIn("shorter than 3 characters", msg)
 
         valid, msg = validate_username_format("user@name")
         self.assertFalse(valid)
         self.assertIn("only contain letters", msg)
 
+        valid, msg = validate_username_format("cat")
+        self.assertTrue(valid)
+
         valid, msg = validate_username_format("gluek")
         self.assertTrue(valid)
+
         valid, msg = validate_username_format("my_group_123")
         self.assertTrue(valid)
 
@@ -63,19 +67,41 @@ class TestUsernameBot(unittest.TestCase):
         extracted = extract_invite_link(text)
         self.assertTrue(extracted.startswith("https://i.delta.chat/#"))
 
-    def test_database_username_claims(self):
-        link = "https://i.delta.chat/#12345?v=3&i=a&s=b&a=c&n=d"
-        database.claim_username("gluek", link, "chat_100")
+    def test_database_username_claims_and_single_chat_limit(self):
+        link1 = "https://i.delta.chat/#12345?v=3&i=a&s=b&a=c&n=d"
+        database.claim_username("first_name", link1, "chat_100")
 
-        claim = database.get_username_claim("gluek")
+        claim = database.get_username_claim("first_name")
         self.assertIsNotNone(claim)
-        self.assertEqual(claim["username"], "gluek")
-        self.assertEqual(claim["invite_link"], link)
+        self.assertEqual(claim["username"], "first_name")
+        self.assertEqual(claim["invite_link"], link1)
         self.assertEqual(claim["claimed_by_chat_id"], "chat_100")
+
+        # Claim a new username for the same chat
+        link2 = "https://i.delta.chat/#67890?v=3&i=a&s=b&a=c&n=d"
+        database.claim_username("second_name", link2, "chat_100")
+
+        # First username should be replaced and deleted
+        self.assertIsNone(database.get_username_claim("first_name"))
 
         chat_claim = database.get_username_by_chat("chat_100")
         self.assertIsNotNone(chat_claim)
-        self.assertEqual(chat_claim["username"], "gluek")
+        self.assertEqual(chat_claim["username"], "second_name")
+
+    def test_unlink_username(self):
+        link = "https://i.delta.chat/#12345?v=3&i=a&s=b&a=c&n=d"
+        database.claim_username("testname", link, "chat_300")
+
+        unbound = database.unlink_chat_username("chat_300")
+        self.assertEqual(unbound, "testname")
+        self.assertIsNone(database.get_username_claim("testname"))
+        self.assertIsNone(database.get_username_by_chat("chat_300"))
+
+        # Test admin forced unlink by username
+        database.claim_username("adminname", link, "chat_400")
+        deleted = database.unlink_username("adminname")
+        self.assertTrue(deleted)
+        self.assertIsNone(database.get_username_claim("adminname"))
 
     def test_pending_username_expiration(self):
         database.set_pending_username("chat_200", "myusername")

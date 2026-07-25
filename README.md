@@ -62,7 +62,10 @@ Send `/initadmin` to the bot in a private message in Delta Chat to complete admi
 | Command | Scope | Description |
 |---|---|---|
 | `/username` | All | Check current registered username and short link. |
-| `/username <name>` | All | Claim or update a username (min 5 chars). |
+| `/username <name>` | All | Claim or update a username (min 3 chars, max 1 per chat). |
+| `/unlink` | All | Unlink registered username from current chat. |
+| `/unlink <name>` | Admin | Force-unlink a registered username. |
+| `/link <name> <url>` | Admin | Create or link a username to an invite URL. |
 | `/help` | All | Show command help and bot info. |
 | `/donate` | All | Support bot development. |
 | `/initadmin` | Admin | Claim administrative ownership. |
