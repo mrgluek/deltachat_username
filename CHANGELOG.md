@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-07-26
+
+### Added
+- **Built-in Application-Level Rate Limiting**:
+  - Implemented an IP-based sliding window rate limiter on the `GET /{username}` redirect route.
+  - Limits requests to 10 per minute per IP address to prevent automated username enumeration attacks.
+  - Returns `HTTP 429 Too Many Requests` with a `Retry-After: 60` header and user-friendly error page upon limit breach.
+  - Configurable via `RATE_LIMIT_REQUESTS` and `RATE_LIMIT_WINDOW` environment variables.
+
+---
+
 ## [1.3.2] - 2026-07-26
 
 ### Fixed

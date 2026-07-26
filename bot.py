@@ -5,12 +5,13 @@ import os
 import re
 import sys
 import threading
+import time
 from urllib.parse import parse_qs, urlparse
 from typing import Optional
 
 from deltachat2 import events, MsgData
 from deltabot_cli import BotCli
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 import uvicorn
 
@@ -21,12 +22,55 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.3.2"
+VERSION = "1.4.0"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
 
 BASE_URL = os.getenv("BASE_URL", "https://d.gluek.info").rstrip("/")
+
+# --- IN-MEMORY RATE LIMITER FOR GET /{username} ---
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "10"))
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))  # seconds
+
+_ip_request_history = {}
+_rate_limit_lock = threading.Lock()
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP address, respecting reverse proxy headers."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
+
+def is_rate_limited(client_ip: str) -> bool:
+    """Sliding-window IP rate limiter checking against RATE_LIMIT_REQUESTS within RATE_LIMIT_WINDOW."""
+    now = time.time()
+    cutoff = now - RATE_LIMIT_WINDOW
+    with _rate_limit_lock:
+        timestamps = _ip_request_history.get(client_ip, [])
+        valid_timestamps = [t for t in timestamps if t > cutoff]
+
+        if len(valid_timestamps) >= RATE_LIMIT_REQUESTS:
+            _ip_request_history[client_ip] = valid_timestamps
+            return True
+
+        valid_timestamps.append(now)
+        _ip_request_history[client_ip] = valid_timestamps
+        return False
+
+
+def clear_rate_limits():
+    """Clear in-memory rate limit records (useful for testing)."""
+    with _rate_limit_lock:
+        _ip_request_history.clear()
 
 
 # --- HELPER FUNCTIONS ---
@@ -576,8 +620,44 @@ def health_check():
 
 
 @app.get("/{username}")
-def redirect_username(username: str):
+def redirect_username(username: str, request: Request):
     clean_username = username.strip().lower()
+
+    # Rate Limit Check (10 requests per minute per IP)
+    client_ip = get_client_ip(request)
+    if is_rate_limited(client_ip):
+        html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>429 - Too Many Requests</title>
+    <style>
+        body {
+            background: #0f172a; color: #f8fafc;
+            font-family: system-ui, sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; margin: 0; text-align: center;
+        }
+        .card {
+            background: rgba(30, 41, 59, 0.8); padding: 40px; border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1); max-width: 450px;
+        }
+        h1 { font-size: 3rem; margin-bottom: 10px; color: #f59e0b; }
+        p { color: #94a3b8; font-size: 1.1rem; margin-bottom: 20px; }
+        a { color: #38bdf8; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>429</h1>
+        <p>Too many requests. Please wait a minute before trying again.</p>
+        <a href="/">Go to Homepage</a>
+    </div>
+</body>
+</html>
+"""
+        return HTMLResponse(content=html, status_code=429, headers={"Retry-After": "60"})
+
     claim = database.get_username_claim(clean_username)
 
     if claim and claim.get("invite_link"):

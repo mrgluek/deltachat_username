@@ -13,16 +13,25 @@ os.environ["DB_PATH"] = tmp_db.name
 os.environ["INVITE_BASE_URL"] = "https://i.gluek.info/#"
 
 import database
-from bot import validate_username_format, validate_invite_link, rewrite_invite_link, extract_invite_link, app
+from bot import (
+    validate_username_format,
+    validate_invite_link,
+    rewrite_invite_link,
+    extract_invite_link,
+    clear_rate_limits,
+    app,
+)
 from fastapi.testclient import TestClient
 
 
 class TestUsernameBot(unittest.TestCase):
     def setUp(self):
         database.init_db()
+        clear_rate_limits()
         self.client = TestClient(app)
 
     def tearDown(self):
+        clear_rate_limits()
         conn = database.get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM usernames")
@@ -132,6 +141,20 @@ class TestUsernameBot(unittest.TestCase):
         res = self.client.get("/doesnm", follow_redirects=False)
         self.assertEqual(res.status_code, 307)
         self.assertEqual(res.headers["location"], "https://i.gluek.info/#ABC12345?v=3&i=1&s=2&a=test&n=test")
+
+    def test_rate_limiting_get_username(self):
+        clear_rate_limits()
+
+        # First 10 requests within window should succeed (returning 404 or 307)
+        for i in range(10):
+            res = self.client.get(f"/test_uname_{i}")
+            self.assertIn(res.status_code, (404, 307))
+
+        # 11th request from the same IP should return 429 Too Many Requests
+        res = self.client.get("/test_uname_11")
+        self.assertEqual(res.status_code, 429)
+        self.assertIn("Retry-After", res.headers)
+        self.assertIn("Too many requests", res.text)
 
 
 if __name__ == "__main__":
