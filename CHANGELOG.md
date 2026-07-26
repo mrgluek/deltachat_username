@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.2] - 2026-07-26
+
+### Fixed
+- **Dynamic HTTP 307 Redirect Domain Rewriting (`GET /{username}`)**:
+  - Ensured `redirect_username` dynamically calls `rewrite_invite_link` on stored database links.
+  - Changing `/inviteurl` or `INVITE_BASE_URL` now instantly applies to all existing and new short URLs without requiring users to re-link their usernames.
+
+---
+
 ## [1.3.1] - 2026-07-26
 
 ### Changed

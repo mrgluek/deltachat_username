@@ -21,7 +21,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -48,12 +48,13 @@ def get_invite_base_url() -> str:
 
 
 def rewrite_invite_link(url: str) -> str:
-    """Rewrite standard https://i.delta.chat/#... link to use custom invite base URL if set."""
+    """Rewrite any standard or existing invite link to use the currently configured invite base URL."""
     if not url:
         return ""
     target_base = get_invite_base_url()
-    if url.startswith("https://i.delta.chat/#"):
-        return target_base + url[len("https://i.delta.chat/#") :]
+    if "/#" in url:
+        hash_idx = url.find("/#")
+        return target_base + url[hash_idx + 2 :]
     return url
 
 
@@ -580,7 +581,8 @@ def redirect_username(username: str):
     claim = database.get_username_claim(clean_username)
 
     if claim and claim.get("invite_link"):
-        return RedirectResponse(url=claim["invite_link"], status_code=307)
+        target_link = rewrite_invite_link(claim["invite_link"])
+        return RedirectResponse(url=target_link, status_code=307)
 
     html = f"""<!DOCTYPE html>
 <html lang="en">

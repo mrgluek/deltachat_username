@@ -113,7 +113,7 @@ class TestUsernameBot(unittest.TestCase):
         self.assertTrue(deleted)
         self.assertIsNone(database.get_username_claim("adminname"))
 
-    def test_fastapi_endpoints(self):
+    def test_fastapi_endpoints_and_dynamic_redirect_rewrite(self):
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
         self.assertIn("Delta Chat Username Service", res.text)
@@ -125,12 +125,13 @@ class TestUsernameBot(unittest.TestCase):
         res = self.client.get("/nonexistent")
         self.assertEqual(res.status_code, 404)
 
-        link = "https://i.gluek.info/#ABC12345?v=3&i=1&s=2&a=test&n=test"
-        database.claim_username("gluek", link, "chat_100")
+        # Even if stored as official i.delta.chat in DB, HTTP 307 redirect must dynamically rewrite to i.gluek.info
+        old_official_link = "https://i.delta.chat/#ABC12345?v=3&i=1&s=2&a=test&n=test"
+        database.claim_username("doesnm", old_official_link, "chat_100")
 
-        res = self.client.get("/gluek", follow_redirects=False)
+        res = self.client.get("/doesnm", follow_redirects=False)
         self.assertEqual(res.status_code, 307)
-        self.assertEqual(res.headers["location"], link)
+        self.assertEqual(res.headers["location"], "https://i.gluek.info/#ABC12345?v=3&i=1&s=2&a=test&n=test")
 
 
 if __name__ == "__main__":
