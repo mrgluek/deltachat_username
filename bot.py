@@ -22,7 +22,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
