@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-07-26
+
+### Added
+- **Configurable Custom Invite Domain (`INVITE_BASE_URL`)**:
+  - Added support for custom invite domains/mirrors (e.g. `https://i.gluek.info/#`) to bypass DPI blocks on `i.delta.chat`.
+  - Configurable via environment variable `INVITE_BASE_URL` or admin command `/inviteurl <url>`.
+  - Automatically rewrites generated group chat and bot QR code invite links to use the mirror domain.
+  - Link validation accepts any mirror domain with valid Delta Chat parameters.
+
+---
+
 ## [1.2.0] - 2026-07-26
 
 ### Added

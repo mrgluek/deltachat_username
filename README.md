@@ -71,6 +71,7 @@ Send `/initadmin` to the bot in a private message in Delta Chat to complete admi
 | `/donate` | All | Support bot development. |
 | `/initadmin` | Admin | Claim administrative ownership. |
 | `/url <url>` | Admin | Set base domain URL (`https://d.gluek.info`). |
+| `/inviteurl <url>` | Admin | Set custom invite base URL/mirror (`https://i.gluek.info/#`). |
 | `/stats` | Admin | Show registered usernames and database stats. |
 | `/transports` | Admin | List configured mail relays and statistics. |
 

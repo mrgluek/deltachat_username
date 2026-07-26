@@ -21,7 +21,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -30,6 +30,31 @@ BASE_URL = os.getenv("BASE_URL", "https://d.gluek.info").rstrip("/")
 
 
 # --- HELPER FUNCTIONS ---
+
+
+def get_invite_base_url() -> str:
+    """Get configured invite base URL (e.g. https://i.gluek.info/# or https://i.delta.chat/#)."""
+    db_val = database.get_config("invite_base_url")
+    if db_val:
+        url = db_val.strip()
+        if not url.endswith("#"):
+            url = url.rstrip("/") + "/#"
+        return url
+
+    env_val = os.getenv("INVITE_BASE_URL", "https://i.delta.chat/#").strip()
+    if not env_val.endswith("#"):
+        env_val = env_val.rstrip("/") + "/#"
+    return env_val
+
+
+def rewrite_invite_link(url: str) -> str:
+    """Rewrite standard https://i.delta.chat/#... link to use custom invite base URL if set."""
+    if not url:
+        return ""
+    target_base = get_invite_base_url()
+    if url.startswith("https://i.delta.chat/#"):
+        return target_base + url[len("https://i.delta.chat/#") :]
+    return url
 
 
 def configure_bot_profile(bot, accid: int):
@@ -166,12 +191,14 @@ def validate_username_format(username: str) -> tuple[bool, str]:
 def validate_invite_link(url: str) -> bool:
     """
     Validate Delta Chat invite link:
-    Must start with https://i.delta.chat/# and contain v=3, i, s, a, n query parameters.
+    Must contain /# and required query parameters v=3, i, s, a, n.
+    Supports official and mirror domains (e.g. i.delta.chat, i.gluek.info).
     """
-    if not url or not url.startswith("https://i.delta.chat/#"):
+    if not url or "/#" not in url:
         return False
 
-    fragment_part = url[len("https://i.delta.chat/#") :]
+    hash_idx = url.find("/#")
+    fragment_part = url[hash_idx + 2 :]
     if "?" in fragment_part:
         query_str = fragment_part.split("?", 1)[1]
     else:
@@ -191,10 +218,10 @@ def validate_invite_link(url: str) -> bool:
 
 
 def extract_invite_link(text: str) -> str:
-    """Extract Delta Chat invite link from text if present."""
+    """Extract Delta Chat invite link from text if present (supports mirror domains)."""
     if not text:
         return ""
-    match = re.search(r"https://i\.delta\.chat/#\S+", text)
+    match = re.search(r"https?://\S+?/#\S+", text)
     return match.group(0) if match else ""
 
 
@@ -619,8 +646,9 @@ def get_help_text(bot, accid: int, from_id: int) -> str:
             f"**Admin Commands:**\n"
             f"/unlink <name> — Force unlink a registered username\n"
             f"/link <name> <url> — Admin custom link binding\n"
-            f"/stats — Show usage statistics\n"
+            f"/inviteurl <url> — Set invite base domain (e.g. https://i.gluek.info/#)\n"
             f"/url <url> — Set bot public short domain URL\n"
+            f"/stats — Show usage statistics\n"
             f"/transports — Show configured mail relays & stats\n"
             f"/addtransport — Add backup mail relay\n"
             f"/rmtransport <addr> — Remove mail relay\n"
@@ -826,13 +854,14 @@ def link_command(bot, accid, event):
                     bot,
                     accid,
                     msg.chat_id,
-                    MsgData(text="❌ Invalid invite link format. Must start with `https://i.delta.chat/#` and include required query parameters."),
+                    MsgData(text="❌ Invalid invite link format. Must contain `/#` and required query parameters."),
                 )
                 return
-            invite_url = provided_link
+            invite_url = rewrite_invite_link(provided_link)
         else:
             try:
                 invite_url = bot.rpc.get_chat_securejoin_qr_code(accid, msg.chat_id)
+                invite_url = rewrite_invite_link(invite_url)
             except Exception as e:
                 _dc_send_msg_with_stats(
                     bot, accid, msg.chat_id, MsgData(text=f"❌ Could not generate group invite link: {e}")
@@ -878,10 +907,12 @@ def link_command(bot, accid, event):
             accid,
             msg.chat_id,
             MsgData(
-                text="❌ Invalid invite link format. Must start with `https://i.delta.chat/#` and include required query parameters."
+                text="❌ Invalid invite link format. Must contain `/#` and required query parameters."
             ),
         )
         return
+
+    invite_url = rewrite_invite_link(invite_url)
 
     existing_claim = database.get_username_claim(target_username)
     if existing_claim and str(existing_claim["claimed_by_chat_id"]) != str(msg.chat_id) and not is_admin:
@@ -995,6 +1026,31 @@ def url_command(bot, accid, event):
 
     database.set_config("base_url", url)
     _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"✅ Base domain URL set to: `{url}`"))
+
+
+@dc_cli.on(events.NewMessage(command="/inviteurl"))
+def inviteurl_command(bot, accid, event):
+    msg = event.msg
+    if not _is_dc_admin(bot, accid, msg.from_id):
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="❌ This command is only for the administrator."))
+        return
+
+    payload = event.payload.strip()
+    if not payload:
+        current_url = get_invite_base_url()
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"🔗 Invite base URL: `{current_url}`"))
+        return
+
+    url = payload.strip()
+    if not url.startswith("http://") and not url.startswith("https://"):
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="❌ URL must start with http:// or https://"))
+        return
+
+    if not url.endswith("#"):
+        url = url.rstrip("/") + "/#"
+
+    database.set_config("invite_base_url", url)
+    _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"✅ Invite base URL set to: `{url}`"))
 
 
 @dc_cli.on(events.NewMessage(command="/stats"))
@@ -1207,6 +1263,7 @@ def on_start(bot, _args):
 
         try:
             qrdata = bot.rpc.get_chat_securejoin_qr_code(accid, None)
+            qrdata = rewrite_invite_link(qrdata)
             database.set_config("bot_invite_url", qrdata)
             print("\nTo add this bot, scan the QR code or copy the link below:\n")
 

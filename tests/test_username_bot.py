@@ -10,9 +10,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # Use temporary database for testing
 tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 os.environ["DB_PATH"] = tmp_db.name
+os.environ["INVITE_BASE_URL"] = "https://i.gluek.info/#"
 
 import database
-from bot import validate_username_format, validate_invite_link, extract_invite_link, app
+from bot import validate_username_format, validate_invite_link, rewrite_invite_link, extract_invite_link, app
 from fastapi.testclient import TestClient
 
 
@@ -48,27 +49,36 @@ class TestUsernameBot(unittest.TestCase):
         valid, msg = validate_username_format("my_group_123")
         self.assertTrue(valid)
 
-    def test_invite_link_validation(self):
-        valid_link = (
+    def test_invite_link_validation_and_mirror_domain(self):
+        valid_official_link = (
             "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39"
             "&v=3&i=W1VHKuRB8xripefA-rW-af3G&s=zfsEz5mBh2R5vQA0u-i6Mwev"
             "&a=gluek%40chatmail.uk&n=Gluek"
         )
-        self.assertTrue(validate_invite_link(valid_link))
+        self.assertTrue(validate_invite_link(valid_official_link))
 
-        invalid_link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39"
+        valid_mirror_link = (
+            "https://i.gluek.info/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39"
+            "&v=3&i=W1VHKuRB8xripefA-rW-af3G&s=zfsEz5mBh2R5vQA0u-i6Mwev"
+            "&a=gluek%40chatmail.uk&n=Gluek"
+        )
+        self.assertTrue(validate_invite_link(valid_mirror_link))
+
+        invalid_link = "https://i.gluek.info/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39"
         self.assertFalse(validate_invite_link(invalid_link))
 
-        wrong_domain = "https://example.com/#v=3&i=1&s=2&a=test&n=test"
-        self.assertFalse(validate_invite_link(wrong_domain))
+    def test_rewrite_invite_link(self):
+        official_link = "https://i.delta.chat/#12345?v=3&i=a&s=b&a=c&n=d"
+        rewritten = rewrite_invite_link(official_link)
+        self.assertTrue(rewritten.startswith("https://i.gluek.info/#"))
 
     def test_extract_invite_link(self):
-        text = "Here is my link: https://i.delta.chat/#12345&v=3&i=a&s=b&a=c&n=d Thanks!"
+        text = "Here is my link: https://i.gluek.info/#12345&v=3&i=a&s=b&a=c&n=d Thanks!"
         extracted = extract_invite_link(text)
-        self.assertTrue(extracted.startswith("https://i.delta.chat/#"))
+        self.assertTrue(extracted.startswith("https://i.gluek.info/#"))
 
     def test_database_username_claims_and_single_chat_limit(self):
-        link1 = "https://i.delta.chat/#12345?v=3&i=a&s=b&a=c&n=d"
+        link1 = "https://i.gluek.info/#12345?v=3&i=a&s=b&a=c&n=d"
         database.claim_username("first_name", link1, "chat_100")
 
         claim = database.get_username_claim("first_name")
@@ -78,7 +88,7 @@ class TestUsernameBot(unittest.TestCase):
         self.assertEqual(claim["claimed_by_chat_id"], "chat_100")
 
         # Claim a new username for the same chat
-        link2 = "https://i.delta.chat/#67890?v=3&i=a&s=b&a=c&n=d"
+        link2 = "https://i.gluek.info/#67890?v=3&i=a&s=b&a=c&n=d"
         database.claim_username("second_name", link2, "chat_100")
 
         # First username should be replaced and deleted
@@ -89,7 +99,7 @@ class TestUsernameBot(unittest.TestCase):
         self.assertEqual(chat_claim["username"], "second_name")
 
     def test_unlink_username(self):
-        link = "https://i.delta.chat/#12345?v=3&i=a&s=b&a=c&n=d"
+        link = "https://i.gluek.info/#12345?v=3&i=a&s=b&a=c&n=d"
         database.claim_username("testname", link, "chat_300")
 
         unbound = database.unlink_chat_username("chat_300")
@@ -115,7 +125,7 @@ class TestUsernameBot(unittest.TestCase):
         res = self.client.get("/nonexistent")
         self.assertEqual(res.status_code, 404)
 
-        link = "https://i.delta.chat/#ABC12345?v=3&i=1&s=2&a=test&n=test"
+        link = "https://i.gluek.info/#ABC12345?v=3&i=1&s=2&a=test&n=test"
         database.claim_username("gluek", link, "chat_100")
 
         res = self.client.get("/gluek", follow_redirects=False)
