@@ -22,7 +22,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -236,8 +236,8 @@ def validate_username_format(username: str) -> tuple[bool, str]:
 def validate_invite_link(url: str) -> bool:
     """
     Validate Delta Chat invite link:
-    Must contain /# and required query parameters v=3, i, s, a, n.
-    Supports official and mirror domains (e.g. i.delta.chat, i.gluek.info).
+    Supports 1-on-1 contact links (i, s, a, n), channel/broadcast links (x, j, s, a, n, b),
+    and group links across official and mirror domains.
     """
     if not url or "/#" not in url:
         return False
@@ -250,11 +250,14 @@ def validate_invite_link(url: str) -> bool:
         query_str = fragment_part
 
     params = parse_qs(query_str)
-    required_params = ["i", "s", "a", "n"]
 
-    for p in required_params:
-        if p not in params or not params[p][0]:
-            return False
+    # Must contain at least one token parameter (i or x or j or g)
+    token_present = any(k in params and params[k][0] for k in ["i", "x", "j", "g"])
+    # Must contain at least signature, address, or broadcast parameter
+    id_present = any(k in params and params[k][0] for k in ["s", "a", "b", "n"])
+
+    if not (token_present and id_present):
+        return False
 
     if "v" in params and params["v"][0] != "3":
         return False

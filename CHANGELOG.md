@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.3] - 2026-07-26
+
+### Fixed
+- **Support Channel & Broadcast Invite Links**:
+  - Expanded `validate_invite_link` in `bot.py` to support Delta Chat channel and broadcast invite URLs.
+  - Channel/broadcast links use token parameters `x` and `j` (instead of standard contact token `i`) and broadcast parameter `b`.
+
+---
+
 ## [1.4.2] - 2026-07-26
 
 ### Changed

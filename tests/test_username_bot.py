@@ -73,6 +73,16 @@ class TestUsernameBot(unittest.TestCase):
         )
         self.assertTrue(validate_invite_link(valid_mirror_link))
 
+        # Channel / Broadcast invite link format test
+        channel_link = (
+            "https://i.delta.chat/#23753C03773D5FA52196017D60656FB4C682FA6C"
+            "&v=3&x=4cfQHFUQjomc9UDGUWxzlmhH&j=RQ9JDugx5OwkVNPE-A55Rcu6"
+            "&s=FEigHtgCiHEV172Ibqim9HDG&a=68h4f6okffwill7x%40dnd.wb.ru"
+            "&n=%28m%E1%B5%89%29%E1%B5%88+%E2%89%A1+m+%28mod+_"
+            "&b=%D0%A1%D0%B1%D0%BE%D1%80%D0%B8%D1%89%D0%B5+%D0%BD%D0%B0%D0%BA%D0%BB%D0%B5%D0%B5%D0%BA"
+        )
+        self.assertTrue(validate_invite_link(channel_link))
+
         invalid_link = "https://i.gluek.info/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39"
         self.assertFalse(validate_invite_link(invalid_link))
 
