@@ -22,7 +22,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -1304,7 +1304,14 @@ def resilient_command(bot, accid, event):
 
 
 def run_fastapi(host: str = "0.0.0.0", port: int = 8080):
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+    )
 
 
 @dc_cli.on_init

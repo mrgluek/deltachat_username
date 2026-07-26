@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.1] - 2026-07-26
+
+### Fixed
+- **Proxy Headers Trust (`proxy_headers=True`)**:
+  - Configured Uvicorn server in `bot.py` with `proxy_headers=True` and `forwarded_allow_ips="*"`.
+  - Enables Uvicorn to parse `X-Forwarded-For` from reverse proxies (such as Caddy inside Docker) and print real client IP addresses in logs and rate limit checks.
+
+---
+
 ## [1.4.0] - 2026-07-26
 
 ### Added
