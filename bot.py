@@ -22,7 +22,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.4.3"
+VERSION = "1.4.4"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -1016,13 +1016,23 @@ def link_command(bot, accid, event):
         return
 
     prev_claim = database.get_username_by_chat(msg.chat_id)
-    old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
 
-    claim_owner = f"admin_linked_{target_username}" if (is_admin and existing_claim and str(existing_claim["claimed_by_chat_id"]) != str(msg.chat_id)) else msg.chat_id
+    # For Admin: if adding a secondary/different username in private chat,
+    # do NOT overwrite/unlink the admin's personal chat username!
+    if is_admin:
+        if prev_claim and prev_claim["username"] != target_username:
+            claim_owner = f"admin_linked_{target_username}"
+            old_username = None
+        else:
+            claim_owner = msg.chat_id
+            old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
+    else:
+        claim_owner = msg.chat_id
+        old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
 
     database.claim_username(target_username, invite_url, claim_owner)
 
-    reply_text = f"Done! Your invite link is now:\n{base_url}/{target_username}"
+    reply_text = f"Done! The invite link for **{target_username}** is now:\n{base_url}/{target_username}"
     if old_username:
         reply_text += f"\n\n(Previous username `{old_username}` was unlinked)"
 

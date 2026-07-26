@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.4] - 2026-07-26
+
+### Fixed
+- **Admin Multi-Username Support (`/link`)**:
+  - Fixed an issue where an administrator adding additional usernames in private chat (e.g. `/link stickers <channel_url>`) unintentionally overwrote and unlinked the admin's personal profile username (`gluek`).
+  - Admins can now register an unlimited number of custom username links without affecting their personal primary username.
+
+---
+
 ## [1.4.3] - 2026-07-26
 
 ### Fixed

@@ -117,6 +117,25 @@ class TestUsernameBot(unittest.TestCase):
         self.assertIsNotNone(chat_claim)
         self.assertEqual(chat_claim["username"], "second_name")
 
+    def test_admin_multi_username_claim(self):
+        user_link = "https://i.gluek.info/#111?v=3&i=a&s=b&a=c&n=d"
+        channel_link = "https://i.gluek.info/#222?v=3&x=a&j=b&s=c&a=d&n=e"
+
+        # Admin claims personal username
+        database.claim_username("gluek", user_link, "admin_chat_id")
+
+        # Admin claims secondary username for a channel using admin owner tag
+        database.claim_username("stickers", channel_link, "admin_linked_stickers")
+
+        # Both usernames must remain active simultaneously!
+        claim1 = database.get_username_claim("gluek")
+        claim2 = database.get_username_claim("stickers")
+
+        self.assertIsNotNone(claim1)
+        self.assertIsNotNone(claim2)
+        self.assertEqual(claim1["username"], "gluek")
+        self.assertEqual(claim2["username"], "stickers")
+
     def test_unlink_username(self):
         link = "https://i.gluek.info/#12345?v=3&i=a&s=b&a=c&n=d"
         database.claim_username("testname", link, "chat_300")
