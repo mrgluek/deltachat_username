@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.1] - 2026-07-26
+
+### Changed
+- **Direct Delta Chat Invite Link Lookup (`/username <name>`)**:
+  - `/username <name>` now returns the direct canonical `https://i.delta.chat/#...` invite link instead of the short redirect link.
+  - This allows the Delta Chat application to natively recognize the link in chat, highlight it, and open the target contact/group directly without opening an external browser.
+
+---
+
 ## [1.3.0] - 2026-07-26
 
 ### Added

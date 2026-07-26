@@ -21,7 +21,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -544,7 +544,7 @@ def get_index_page():
         <div class="commands-grid">
             <div class="command-card">
                 <div class="command-name">/username [name]</div>
-                <div class="command-desc">View your registered username, or look up short link for any username.</div>
+                <div class="command-desc">View your registered username, or look up direct Delta Chat invite link for any username.</div>
             </div>
             <div class="command-card">
                 <div class="command-name">/link myname [link]</div>
@@ -627,7 +627,7 @@ def get_help_text(bot, accid: int, from_id: int) -> str:
         f"Claim short invite links for your profile or group chat! (`{base_url}/<username>`)\n\n"
         f"**Commands:**\n"
         f"/username — Check your current registered username\n"
-        f"/username <name> — Look up short link for any registered username\n"
+        f"/username <name> — Look up direct Delta Chat invite link for any registered username\n"
         f"/link <name> <link> — Bind username to invite link (Group: `/link <name>`)\n"
         f"/unlink — Unlink registered username from this chat\n"
         f"/donate — Support bot development ❤️\n"
@@ -790,15 +790,21 @@ def username_command(bot, accid, event):
                 )
         return
 
-    # --- SCENARIO B: LOOKUP ANY USERNAME SHORT LINK ---
+    # --- SCENARIO B: LOOKUP ANY USERNAME DIRECT INVITE LINK ---
     target_username = raw_payload.lower()
     claim = database.get_username_claim(target_username)
     if claim:
+        raw_link = claim.get("invite_link", "")
+        if "/#" in raw_link:
+            canonical_link = "https://i.delta.chat/#" + raw_link[raw_link.find("/#") + 2 :]
+        else:
+            canonical_link = raw_link
+
         _dc_send_msg_with_stats(
             bot,
             accid,
             msg.chat_id,
-            MsgData(text=f"Username **{target_username}**: {base_url}/{target_username}"),
+            MsgData(text=f"Username **{target_username}**:\n{canonical_link}"),
         )
     else:
         _dc_send_msg_with_stats(
