@@ -21,7 +21,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -516,23 +516,19 @@ def get_index_page():
         <h2 class="section-title">⚡️ How It Works</h2>
         <div class="commands-grid">
             <div class="command-card">
-                <div class="command-name">/username</div>
-                <div class="command-desc">Check your current registered username and short invite link.</div>
+                <div class="command-name">/username [name]</div>
+                <div class="command-desc">View your registered username, or look up short link for any username.</div>
             </div>
             <div class="command-card">
-                <div class="command-name">/username myname</div>
-                <div class="command-desc">Claim or update a custom username (min 3 characters).
-                <br>• <strong>Private Chat:</strong> Reserve your username, then send your Delta Chat invite link.
-                <br>• <strong>Group Chat:</strong> Immediately binds <code>{base_url}/myname</code> to the group chat invite link.
+                <div class="command-name">/link myname [link]</div>
+                <div class="command-desc">Claim or update custom username (min 3 characters).
+                <br>• <strong>Private Chat:</strong> Send <code>/link myname https://i.delta.chat/#...</code>
+                <br>• <strong>Group Chat:</strong> Send <code>/link myname</code> to auto-generate group invite link.
                 </div>
             </div>
             <div class="command-card">
                 <div class="command-name">/unlink</div>
                 <div class="command-desc">Unlink the current registered username from this chat.</div>
-            </div>
-            <div class="command-card">
-                <div class="command-name">Send Invite Link</div>
-                <div class="command-desc">Send your standard <code>https://i.delta.chat/#...</code> link to complete user registration.</div>
             </div>
         </div>
 
@@ -604,7 +600,8 @@ def get_help_text(bot, accid: int, from_id: int) -> str:
         f"Claim short invite links for your profile or group chat! (`{base_url}/<username>`)\n\n"
         f"**Commands:**\n"
         f"/username — Check your current registered username\n"
-        f"/username <name> — Claim or update custom username (min 3 chars)\n"
+        f"/username <name> — Look up short link for any registered username\n"
+        f"/link <name> <link> — Bind username to invite link (Group: `/link <name>`)\n"
         f"/unlink — Unlink registered username from this chat\n"
         f"/donate — Support bot development ❤️\n"
         f"/help — Show this help message\n\n"
@@ -621,7 +618,7 @@ def get_help_text(bot, accid: int, from_id: int) -> str:
         help_text += (
             f"**Admin Commands:**\n"
             f"/unlink <name> — Force unlink a registered username\n"
-            f"/link <name> <url> — Create or link a username to an invite URL\n"
+            f"/link <name> <url> — Admin custom link binding\n"
             f"/stats — Show usage statistics\n"
             f"/url <url> — Set bot public short domain URL\n"
             f"/transports — Show configured mail relays & stats\n"
@@ -723,7 +720,7 @@ def username_command(bot, accid, event):
 
     is_group = is_group_chat(bot, accid, msg.chat_id)
 
-    # --- SCENARIO A: CHECK CURRENT STATUS ---
+    # --- SCENARIO A: CHECK CURRENT CHAT'S USERNAME ---
     if not raw_payload:
         current_claim = database.get_username_by_chat(msg.chat_id)
         if current_claim:
@@ -751,7 +748,7 @@ def username_command(bot, accid, event):
                     accid,
                     msg.chat_id,
                     MsgData(
-                        text="This group chat doesn't have a registered username yet. Send `/username <name>` to claim one."
+                        text="This group chat doesn't have a registered username yet. Send `/link <username>` to claim one."
                     ),
                 )
             else:
@@ -760,21 +757,134 @@ def username_command(bot, accid, event):
                     accid,
                     msg.chat_id,
                     MsgData(
-                        text="You don't have a registered username yet. Send `/username <name>` to claim one."
+                        text="You don't have a registered username yet. Send `/link <username> <invite_link>` to claim one."
                     ),
                 )
         return
 
-    # --- SCENARIO B: CLAIM OR UPDATE USERNAME ---
+    # --- SCENARIO B: LOOKUP ANY USERNAME SHORT LINK ---
     target_username = raw_payload.lower()
+    claim = database.get_username_claim(target_username)
+    if claim:
+        _dc_send_msg_with_stats(
+            bot,
+            accid,
+            msg.chat_id,
+            MsgData(text=f"Username **{target_username}**: {base_url}/{target_username}"),
+        )
+    else:
+        _dc_send_msg_with_stats(
+            bot,
+            accid,
+            msg.chat_id,
+            MsgData(text=f"Username `{target_username}` is not registered."),
+        )
+
+
+@dc_cli.on(events.NewMessage(command="/link"))
+def link_command(bot, accid, event):
+    msg = event.msg
+    base_url = database.get_config("base_url") or BASE_URL
+    raw_payload = event.payload.strip()
+    is_group = is_group_chat(bot, accid, msg.chat_id)
+    is_admin = _is_dc_admin(bot, accid, msg.from_id)
+
+    parts = raw_payload.split(None, 1) if raw_payload else []
+
+    # --- SCENARIO A: GROUP CHAT LINKING ---
+    if is_group:
+        if not parts:
+            _dc_send_msg_with_stats(
+                bot,
+                accid,
+                msg.chat_id,
+                MsgData(text="Usage in group chat:\n/link <username>"),
+            )
+            return
+
+        target_username = parts[0].lower()
+        provided_link = parts[1].strip() if len(parts) > 1 else None
+
+        valid, err_msg = validate_username_format(target_username)
+        if not valid:
+            _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ {err_msg}"))
+            return
+
+        existing_claim = database.get_username_claim(target_username)
+        if existing_claim and str(existing_claim["claimed_by_chat_id"]) != str(msg.chat_id) and not is_admin:
+            _dc_send_msg_with_stats(
+                bot,
+                accid,
+                msg.chat_id,
+                MsgData(text=f"Username `{target_username}` is already taken by another user/chat. Please choose another."),
+            )
+            return
+
+        if provided_link:
+            if not validate_invite_link(provided_link):
+                _dc_send_msg_with_stats(
+                    bot,
+                    accid,
+                    msg.chat_id,
+                    MsgData(text="❌ Invalid invite link format. Must start with `https://i.delta.chat/#` and include required query parameters."),
+                )
+                return
+            invite_url = provided_link
+        else:
+            try:
+                invite_url = bot.rpc.get_chat_securejoin_qr_code(accid, msg.chat_id)
+            except Exception as e:
+                _dc_send_msg_with_stats(
+                    bot, accid, msg.chat_id, MsgData(text=f"❌ Could not generate group invite link: {e}")
+                )
+                return
+
+        prev_claim = database.get_username_by_chat(msg.chat_id)
+        old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
+
+        database.claim_username(target_username, invite_url, msg.chat_id)
+
+        reply_text = f"Done! This group chat's invite link is now:\n{base_url}/{target_username}"
+        if old_username:
+            reply_text += f"\n\n(Previous username `{old_username}` was unlinked)"
+
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=reply_text))
+        return
+
+    # --- SCENARIO B: PRIVATE CHAT (USER OR ADMIN LINKING) ---
+    if len(parts) < 2:
+        _dc_send_msg_with_stats(
+            bot,
+            accid,
+            msg.chat_id,
+            MsgData(
+                text="Usage:\n"
+                "/link <username> <invite_link>\n"
+                "Example: /link myname https://i.delta.chat/#..."
+            ),
+        )
+        return
+
+    target_username, invite_url = parts[0].lower(), parts[1].strip()
 
     valid, err_msg = validate_username_format(target_username)
     if not valid:
         _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ {err_msg}"))
         return
 
+    if not validate_invite_link(invite_url):
+        _dc_send_msg_with_stats(
+            bot,
+            accid,
+            msg.chat_id,
+            MsgData(
+                text="❌ Invalid invite link format. Must start with `https://i.delta.chat/#` and include required query parameters."
+            ),
+        )
+        return
+
     existing_claim = database.get_username_claim(target_username)
-    if existing_claim and str(existing_claim["claimed_by_chat_id"]) != str(msg.chat_id):
+    if existing_claim and str(existing_claim["claimed_by_chat_id"]) != str(msg.chat_id) and not is_admin:
         _dc_send_msg_with_stats(
             bot,
             accid,
@@ -783,32 +893,18 @@ def username_command(bot, accid, event):
         )
         return
 
-    if is_group:
-        try:
-            invite_url = bot.rpc.get_chat_securejoin_qr_code(accid, msg.chat_id)
-        except Exception as e:
-            _dc_send_msg_with_stats(
-                bot, accid, msg.chat_id, MsgData(text=f"❌ Could not generate group invite link: {e}")
-            )
-            return
+    prev_claim = database.get_username_by_chat(msg.chat_id)
+    old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
 
-        database.claim_username(target_username, invite_url, msg.chat_id)
-        _dc_send_msg_with_stats(
-            bot,
-            accid,
-            msg.chat_id,
-            MsgData(text=f"Done! This group chat's invite link is now:\n{base_url}/{target_username}"),
-        )
-    else:
-        database.set_pending_username(msg.chat_id, target_username)
-        _dc_send_msg_with_stats(
-            bot,
-            accid,
-            msg.chat_id,
-            MsgData(
-                text=f"Username `{target_username}` is ready to link. Please send your Delta Chat invite link starting with:\nhttps://i.delta.chat/#...&v=3&i=...&s=...&a=...&n=..."
-            ),
-        )
+    claim_owner = f"admin_linked_{target_username}" if (is_admin and existing_claim and str(existing_claim["claimed_by_chat_id"]) != str(msg.chat_id)) else msg.chat_id
+
+    database.claim_username(target_username, invite_url, claim_owner)
+
+    reply_text = f"Done! Your invite link is now:\n{base_url}/{target_username}"
+    if old_username:
+        reply_text += f"\n\n(Previous username `{old_username}` was unlinked)"
+
+    _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=reply_text))
 
 
 @dc_cli.on(events.NewMessage(command="/unlink"))
@@ -863,56 +959,6 @@ def unlink_command(bot, accid, event):
         )
 
 
-@dc_cli.on(events.NewMessage(command="/link"))
-def link_command(bot, accid, event):
-    msg = event.msg
-    if not _is_dc_admin(bot, accid, msg.from_id):
-        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="❌ This command is only for the administrator."))
-        return
-
-    payload = event.payload.strip()
-    parts = payload.split(None, 1)
-    if len(parts) < 2:
-        _dc_send_msg_with_stats(
-            bot,
-            accid,
-            msg.chat_id,
-            MsgData(
-                text="Usage:\n"
-                "/link <username> <invite_link>\n"
-                "Example: /link myname https://i.delta.chat/#..."
-            ),
-        )
-        return
-
-    target_username, invite_url = parts[0].lower(), parts[1].strip()
-
-    valid, err_msg = validate_username_format(target_username)
-    if not valid:
-        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=f"❌ {err_msg}"))
-        return
-
-    if not validate_invite_link(invite_url):
-        _dc_send_msg_with_stats(
-            bot,
-            accid,
-            msg.chat_id,
-            MsgData(
-                text="❌ Invalid invite link format. Must start with `https://i.delta.chat/#` and include required query parameters."
-            ),
-        )
-        return
-
-    base_url = database.get_config("base_url") or BASE_URL
-    database.claim_username(target_username, invite_url, f"admin_linked_{target_username}")
-    _dc_send_msg_with_stats(
-        bot,
-        accid,
-        msg.chat_id,
-        MsgData(text=f"✅ Linked username `{target_username}` to invite link:\n{base_url}/{target_username}"),
-    )
-
-
 @dc_cli.on(events.NewMessage)
 def on_new_message(bot, accid, event):
     msg = event.msg
@@ -927,50 +973,6 @@ def on_new_message(bot, accid, event):
         pass
 
     _is_dc_admin(bot, accid, msg.from_id)
-
-    text = (msg.text or "").strip()
-    if not text or text.startswith("/"):
-        return
-
-    # --- SCENARIO C: PROCESS & VALIDATE INVITE LINK ---
-    invite_url = extract_invite_link(text)
-    if invite_url:
-        pending_username = database.get_pending_username(msg.chat_id)
-        if not pending_username:
-            current_claim = database.get_username_by_chat(msg.chat_id)
-            if current_claim:
-                pending_username = current_claim["username"]
-
-        if not pending_username:
-            _dc_send_msg_with_stats(
-                bot,
-                accid,
-                msg.chat_id,
-                MsgData(text="You haven't requested a username claim yet. Send `/username <name>` first."),
-            )
-            return
-
-        if not validate_invite_link(invite_url):
-            _dc_send_msg_with_stats(
-                bot,
-                accid,
-                msg.chat_id,
-                MsgData(
-                    text="❌ Invalid invite link format. Please make sure your link starts with `https://i.delta.chat/#` and includes required parameters (v=3, i, s, a, n)."
-                ),
-            )
-            return
-
-        database.claim_username(pending_username, invite_url, msg.chat_id)
-        database.clear_pending_username(msg.chat_id)
-
-        base_url = database.get_config("base_url") or BASE_URL
-        _dc_send_msg_with_stats(
-            bot,
-            accid,
-            msg.chat_id,
-            MsgData(text=f"Done! Your invite link: {base_url}/{pending_username}"),
-        )
 
 
 @dc_cli.on(events.NewMessage(command="/url"))

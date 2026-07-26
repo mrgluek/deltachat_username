@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-07-26
+
+### Added
+- **Public Username Lookup (`/username <name>`)**: Any user can now look up the short link for any registered username via `/username <name>`.
+- **Single-Step Explicit Linking (`/link`)**:
+  - Private chats: `/link <username> <invite_link>` binds a custom username and invite URL in a single step.
+  - Group chats: `/link <username>` automatically generates the group invite link via RPC and binds it.
+  - Previous username replacement: If a chat already had a username, claiming a new one automatically unlinks the previous username and notifies the user.
+- **Admin Custom Linking**: Admins can force-link any username to any invite link.
+
+### Removed
+- **Passive Link Watching**: Removed passive listening and error comments on standard text messages containing `i.delta.chat` links in `on_new_message`.
+
+---
+
 ## [1.1.0] - 2026-07-25
 
 ### Added

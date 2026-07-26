@@ -103,13 +103,6 @@ class TestUsernameBot(unittest.TestCase):
         self.assertTrue(deleted)
         self.assertIsNone(database.get_username_claim("adminname"))
 
-    def test_pending_username_expiration(self):
-        database.set_pending_username("chat_200", "myusername")
-        self.assertEqual(database.get_pending_username("chat_200"), "myusername")
-
-        pending = database.get_pending_username("chat_200", ttl_seconds=-1)
-        self.assertIsNone(pending)
-
     def test_fastapi_endpoints(self):
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
