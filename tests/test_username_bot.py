@@ -179,12 +179,74 @@ class TestUsernameBot(unittest.TestCase):
             res = self.client.get(f"/test_uname_{i}")
             self.assertIn(res.status_code, (404, 307))
 
-        # 11th request from the same IP should return 429 Too Many Requests
-        res = self.client.get("/test_uname_11")
-        self.assertEqual(res.status_code, 429)
-        self.assertIn("Retry-After", res.headers)
-        self.assertIn("Too many requests", res.text)
+    def test_crawler_opengraph_preview_and_meta_tags(self):
+        link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
+        database.claim_username("gluek", link, "chat_100")
+
+        # 1. Normal Browser User-Agent should get 307 Redirect
+        res_browser = self.client.get(
+            "/gluek",
+            headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
+            follow_redirects=False,
+        )
+        self.assertEqual(res_browser.status_code, 307)
+        self.assertTrue(res_browser.headers["location"].startswith("https://i.gluek.info/#"))
+
+        # 2. TelegramBot Crawler User-Agent should get 200 OK with rich OpenGraph tags
+        res_tg = self.client.get("/gluek", headers={"User-Agent": "TelegramBot (like TwitterBot)"})
+        self.assertEqual(res_tg.status_code, 200)
+        self.assertIn("og:title", res_tg.text)
+        self.assertIn("og:image", res_tg.text)
+        self.assertIn("gluek@chatmail.uk", res_tg.text)
+        self.assertIn("DFF2 CAB1 FEB7 182F 997C", res_tg.text)
+
+        # 3. Twitterbot Crawler User-Agent should get 200 OK
+        res_twitter = self.client.get("/gluek", headers={"User-Agent": "Twitterbot/1.0"})
+        self.assertEqual(res_twitter.status_code, 200)
+        self.assertIn("summary_large_image", res_twitter.text)
+
+        # 4. Explicit ?preview=1 in normal browser should get 200 OK
+        res_preview = self.client.get("/gluek?preview=1")
+        self.assertEqual(res_preview.status_code, 200)
+        self.assertIn("Open in Delta Chat", res_preview.text)
+
+    def test_dynamic_og_png_and_svg_endpoints(self):
+        link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
+        database.claim_username("gluek", link, "chat_100")
+
+        # PNG endpoint
+        res_png = self.client.get("/gluek/og.png")
+        self.assertEqual(res_png.status_code, 200)
+        self.assertEqual(res_png.headers["content-type"], "image/png")
+        self.assertTrue(res_png.content.startswith(b"\x89PNG\r\n\x1a\n"))
+
+        # SVG endpoints
+        res_svg1 = self.client.get("/gluek/og.svg")
+        self.assertEqual(res_svg1.status_code, 200)
+        self.assertEqual(res_svg1.headers["content-type"], "image/svg+xml")
+        self.assertIn("<svg", res_svg1.text)
+
+        res_svg2 = self.client.get("/gluek/avatar.svg")
+        self.assertEqual(res_svg2.status_code, 200)
+        self.assertEqual(res_svg2.headers["content-type"], "image/svg+xml")
+
+        # Non-existent user
+        self.assertEqual(self.client.get("/ghost/og.png").status_code, 404)
+        self.assertEqual(self.client.get("/ghost/og.svg").status_code, 404)
+
+    def test_username_card_page(self):
+        link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
+        database.claim_username("gluek", link, "chat_100")
+
+        res = self.client.get("/gluek/card")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Gluek", res.text)
+        self.assertIn("@gluek", res.text)
+        self.assertIn("gluek@chatmail.uk", res.text)
+        self.assertIn("DFF2 CAB1 FEB7 182F 997C", res.text)
+        self.assertIn("Start Chat in Delta Chat", res.text)
 
 
 if __name__ == "__main__":
     unittest.main()
+

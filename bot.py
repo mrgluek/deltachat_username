@@ -16,13 +16,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 import uvicorn
 
 import database
+import identicon
 
 try:
     import qrcode
 except ImportError:
     qrcode = None
 
-VERSION = "1.4.4"
+VERSION = "1.5.0"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -71,6 +72,71 @@ def clear_rate_limits():
     """Clear in-memory rate limit records (useful for testing)."""
     with _rate_limit_lock:
         _ip_request_history.clear()
+
+
+# --- CRAWLER DETECTION FOR OPENGRAPH PREVIEWS ---
+CRAWLER_USER_AGENTS = [
+    "telegrambot", "twitterbot", "facebookexternalhit", "discordbot",
+    "slackbot", "whatsapp", "vkshare", "w3c_validator", "redditbot",
+    "applebot", "bingbot", "googlebot", "yandex", "linkedinbot",
+    "mastodon", "matrix", "embedly", "quora link preview", "outbrain",
+    "pinterest", "skypeuripreview",
+]
+
+
+def is_crawler_request(request: Request) -> bool:
+    """Detect if request comes from a social media crawler or preview generator."""
+    ua = request.headers.get("user-agent", "").lower()
+    return any(crawler in ua for crawler in CRAWLER_USER_AGENTS)
+
+
+def format_username_card_text(username: str, invite_link: str, updated_at_iso: str, base_url: str) -> str:
+    """Generate rich verification card text with identicon, emoji badge, and formatted fingerprint."""
+    metadata = identicon.parse_invite_metadata(invite_link, updated_at_iso)
+    raw_link = metadata["canonical_link"]
+    if "/#" in raw_link:
+        canonical_link = "https://i.delta.chat/#" + raw_link[raw_link.find("/#") + 2 :]
+    else:
+        canonical_link = raw_link
+
+    lines = [f"🔗 **Username @{username}**"]
+
+    if metadata.get("relative_time"):
+        lines.append(f"📅 **Linked:** {metadata['relative_time']}")
+
+    if metadata.get("email"):
+        lines.append(f"📧 **Email:** `{metadata['email']}`")
+
+    if metadata.get("display_name"):
+        target_type = metadata.get("target_type", "contact")
+        if target_type == "group":
+            lines.append(f"👥 **Group:** {metadata['display_name']}")
+        elif target_type == "channel":
+            lines.append(f"📢 **Channel:** {metadata['display_name']}")
+        else:
+            lines.append(f"👤 **Name:** {metadata['display_name']}")
+
+    line1, line2 = metadata.get("formatted_fp", ("", ""))
+    if line1 or line2:
+        lines.append("\n🔐 **Fingerprint:**")
+        if line1:
+            lines.append(f"`{line1}`")
+        if line2:
+            lines.append(f"`{line2}`")
+
+    if metadata.get("identicon"):
+        lines.append("\n🛡️ **Visual Key Art:**")
+        lines.append("```")
+        lines.append(metadata["identicon"])
+        lines.append("```")
+
+    if metadata.get("emoji_hash"):
+        lines.append(f"✨ **Visual Badge:** {metadata['emoji_hash']}")
+
+    lines.append(f"\n🌐 **Direct Invite Link:**\n{canonical_link}")
+    lines.append(f"\n🔗 **Short Link:** {base_url}/{username}")
+
+    return "\n".join(lines)
 
 
 # --- HELPER FUNCTIONS ---
@@ -665,6 +731,78 @@ def redirect_username(username: str, request: Request):
 
     if claim and claim.get("invite_link"):
         target_link = rewrite_invite_link(claim["invite_link"])
+        base_url = database.get_config("base_url") or BASE_URL
+        metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+
+        # If crawler or explicit preview requested, return full OpenGraph HTML metadata
+        if is_crawler_request(request) or request.query_params.get("preview") == "1":
+            title_name = metadata.get("display_name") or clean_username
+            og_title = f"{title_name} (@{clean_username}) • Delta Chat"
+            fp_l1, fp_l2 = metadata.get("formatted_fp", ("", ""))
+            og_desc = (
+                f"📧 {metadata.get('email') or 'Delta Chat User'} • "
+                f"🔐 FP: {fp_l1} • "
+                f"🛡️ {metadata.get('emoji_hash')} • "
+                f"📅 Linked: {metadata.get('relative_time')}"
+            )
+            og_img = f"{base_url}/{clean_username}/og.png"
+
+            html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{og_title}</title>
+    <!-- OpenGraph / Facebook / Telegram / Discord -->
+    <meta property="og:type" content="profile">
+    <meta property="og:site_name" content="Delta Chat Username Service">
+    <meta property="og:title" content="{og_title}">
+    <meta property="og:description" content="{og_desc}">
+    <meta property="og:image" content="{og_img}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:url" content="{base_url}/{clean_username}">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{og_title}">
+    <meta name="twitter:description" content="{og_desc}">
+    <meta name="twitter:image" content="{og_img}">
+    <meta http-equiv="refresh" content="0; url={target_link}">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        body {{
+            background: #0f172a; color: #f8fafc;
+            font-family: system-ui, sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; margin: 0; padding: 20px;
+        }}
+        .card {{
+            background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 24px;
+            padding: 35px; max-width: 500px; width: 100%; text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }}
+        h1 {{ font-size: 1.8rem; margin-bottom: 6px; }}
+        p.sub {{ color: #38bdf8; font-weight: 600; margin-bottom: 20px; }}
+        .fp {{ font-family: monospace; background: #020617; padding: 12px; border-radius: 10px; font-size: 0.9rem; color: #38bdf8; margin: 15px 0; word-break: break-all; }}
+        .btn {{ display: inline-block; background: #38bdf8; color: #0f172a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; margin-top: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>{title_name}</h1>
+        <p class="sub">@{clean_username}</p>
+        <p>Linked {metadata.get('relative_time')}</p>
+        <div class="fp">{fp_l1}<br>{fp_l2}</div>
+        <p style="font-size: 1.5rem; margin: 10px 0;">{metadata.get('emoji_hash')}</p>
+        <a href="{target_link}" class="btn">💬 Open in Delta Chat</a>
+    </div>
+</body>
+</html>
+"""
+            return HTMLResponse(content=html, status_code=200)
+
         return RedirectResponse(url=target_link, status_code=307)
 
     html = f"""<!DOCTYPE html>
@@ -698,6 +836,127 @@ def redirect_username(username: str, request: Request):
 </html>
 """
     return HTMLResponse(content=html, status_code=404)
+
+
+@app.get("/{username}/og.png")
+def get_username_og_png(username: str):
+    clean_username = username.strip().lower()
+    claim = database.get_username_claim(clean_username)
+    if not claim or not claim.get("invite_link"):
+        return Response(status_code=404)
+
+    base_url = database.get_config("base_url") or BASE_URL
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    png_bytes = identicon.generate_og_png_bytes(clean_username, metadata, base_url=base_url)
+    if not png_bytes:
+        return Response(status_code=500)
+
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=3600"},
+    )
+
+
+@app.get("/{username}/og.svg")
+@app.get("/{username}/avatar.svg")
+def get_username_avatar_svg(username: str):
+    clean_username = username.strip().lower()
+    claim = database.get_username_claim(clean_username)
+    if not claim or not claim.get("invite_link"):
+        return Response(status_code=404)
+
+    base_url = database.get_config("base_url") or BASE_URL
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    svg_text = identicon.generate_svg_card(clean_username, metadata, base_url=base_url)
+
+    return Response(
+        content=svg_text,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=3600"},
+    )
+
+
+@app.get("/{username}/card", response_class=HTMLResponse)
+def get_username_card_page(username: str):
+    clean_username = username.strip().lower()
+    claim = database.get_username_claim(clean_username)
+    if not claim or not claim.get("invite_link"):
+        return Response(status_code=404)
+
+    base_url = database.get_config("base_url") or BASE_URL
+    target_link = rewrite_invite_link(claim["invite_link"])
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    qr_img = generate_qr_data_uri(target_link)
+
+    title_name = metadata.get("display_name") or clean_username
+    line1, line2 = metadata.get("formatted_fp", ("", ""))
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title_name} (@{clean_username}) • Delta Chat</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta property="og:title" content="{title_name} (@{clean_username}) • Delta Chat">
+    <meta property="og:image" content="{base_url}/{clean_username}/og.png">
+    <style>
+        body {{
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh; display: flex; justify-content: center; align-items: center;
+            padding: 20px; box-sizing: border-box;
+        }}
+        .card {{
+            background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px;
+            padding: 40px; max-width: 540px; width: 100%; text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }}
+        .avatar {{ width: 120px; height: 120px; border-radius: 20px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1); }}
+        h1 {{ font-size: 2rem; margin-bottom: 4px; }}
+        .username {{ color: #38bdf8; font-size: 1.2rem; font-weight: 600; margin-bottom: 15px; }}
+        .badge {{ display: inline-block; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 14px; border-radius: 999px; font-size: 0.875rem; margin-bottom: 20px; }}
+        .info-box {{ background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; margin: 15px 0; text-align: left; }}
+        .info-label {{ font-size: 0.8rem; font-weight: bold; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; }}
+        .fp-text {{ font-family: monospace; font-size: 0.95rem; color: #38bdf8; letter-spacing: 1px; word-break: break-all; }}
+        .qr-box {{ margin: 20px 0; }}
+        .qr-code {{ width: 160px; height: 160px; border-radius: 12px; }}
+        .btn {{ display: block; background: #38bdf8; color: #0f172a; padding: 14px 20px; border-radius: 12px; font-weight: 600; text-decoration: none; font-size: 1.05rem; transition: 0.2s; }}
+        .btn:hover {{ background: #0284c7; color: white; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="/{clean_username}/og.svg" alt="Identicon" class="avatar">
+        <h1>{title_name}</h1>
+        <div class="username">@{clean_username}</div>
+        <span class="badge">Linked: {metadata.get('relative_time')}</span>
+
+        <div class="info-box">
+            <div class="info-label">Email</div>
+            <div><code>{metadata.get('email') or 'Not specified'}</code></div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-label">Cryptographic Fingerprint</div>
+            <div class="fp-text">{line1}<br>{line2}</div>
+        </div>
+
+        <div class="info-box" style="text-align: center;">
+            <div class="info-label">Visual Key Badge</div>
+            <div style="font-size: 1.6rem; margin-top: 4px;">{metadata.get('emoji_hash')}</div>
+        </div>
+
+        {f'<div class="qr-box"><img src="{qr_img}" class="qr-code"></div>' if qr_img else ''}
+
+        <a href="{target_link}" class="btn">💬 Start Chat in Delta Chat</a>
+    </div>
+</body>
+</html>
+"""
+    return HTMLResponse(content=html, status_code=200)
 
 
 # --- DELTA CHAT BOT EVENT HANDLERS ---
@@ -838,22 +1097,13 @@ def username_command(bot, accid, event):
         current_claim = database.get_username_by_chat(msg.chat_id)
         if current_claim:
             uname = current_claim["username"]
-            if is_group:
-                _dc_send_msg_with_stats(
-                    bot,
-                    accid,
-                    msg.chat_id,
-                    MsgData(
-                        text=f"This group chat's username is: **{uname}**.\nInvite link: {base_url}/{uname}"
-                    ),
-                )
-            else:
-                _dc_send_msg_with_stats(
-                    bot,
-                    accid,
-                    msg.chat_id,
-                    MsgData(text=f"Your current username is: **{uname}**.\nYour invite link: {base_url}/{uname}"),
-                )
+            card_text = format_username_card_text(
+                uname,
+                current_claim["invite_link"],
+                current_claim.get("updated_at", ""),
+                base_url,
+            )
+            _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=card_text))
         else:
             if is_group:
                 _dc_send_msg_with_stats(
@@ -879,18 +1129,13 @@ def username_command(bot, accid, event):
     target_username = raw_payload.lower()
     claim = database.get_username_claim(target_username)
     if claim:
-        raw_link = claim.get("invite_link", "")
-        if "/#" in raw_link:
-            canonical_link = "https://i.delta.chat/#" + raw_link[raw_link.find("/#") + 2 :]
-        else:
-            canonical_link = raw_link
-
-        _dc_send_msg_with_stats(
-            bot,
-            accid,
-            msg.chat_id,
-            MsgData(text=f"Username **{target_username}**:\n{canonical_link}"),
+        card_text = format_username_card_text(
+            target_username,
+            claim["invite_link"],
+            claim.get("updated_at", ""),
+            base_url,
         )
+        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=card_text))
     else:
         _dc_send_msg_with_stats(
             bot,
@@ -963,6 +1208,7 @@ def link_command(bot, accid, event):
         old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
 
         database.claim_username(target_username, invite_url, msg.chat_id)
+        identicon.clear_png_cache()
 
         reply_text = f"Done! This group chat's invite link is now:\n{base_url}/{target_username}"
         if old_username:
@@ -1031,6 +1277,7 @@ def link_command(bot, accid, event):
         old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
 
     database.claim_username(target_username, invite_url, claim_owner)
+    identicon.clear_png_cache()
 
     reply_text = f"Done! The invite link for **{target_username}** is now:\n{base_url}/{target_username}"
     if old_username:
@@ -1058,6 +1305,7 @@ def unlink_command(bot, accid, event):
         target_username = payload.lower()
         unlinked = database.unlink_username(target_username)
         if unlinked:
+            identicon.clear_png_cache()
             _dc_send_msg_with_stats(
                 bot,
                 accid,
@@ -1076,6 +1324,7 @@ def unlink_command(bot, accid, event):
     # Case 2: /unlink without parameters (Unlink current chat's username)
     unbound = database.unlink_chat_username(msg.chat_id)
     if unbound:
+        identicon.clear_png_cache()
         _dc_send_msg_with_stats(
             bot,
             accid,

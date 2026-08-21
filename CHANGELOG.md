@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-08-21
+
+### Added
+- **Anti-Impersonation Visual Key Verification**:
+  - Implemented 5x5 horizontally symmetric Unicode block identicons (`██`) for instant visual key recognition.
+  - Implemented a deterministic 5-emoji visual badge system providing ~40 bits of visual entropy from a 256-emoji curated dictionary.
+  - Formatted PGP key fingerprints into standard Delta Chat client 10-group layout (2 lines of 5 groups of 4 uppercase hex characters).
+  - Added registration age calculation (e.g. `19 Aug 2026 (2 days ago)`) to distinguish established accounts from fresh squatters.
+  - Enhanced `/username` and `/username <target>` command responses with rich verification cards.
+- **Smart Crawler Detection & OpenGraph Link Previews**:
+  - Implemented User-Agent crawler detection for Telegram, Discord, Twitter, WhatsApp, Facebook, Matrix, iMessage, etc.
+  - Crawlers receive full `og:title`, `og:description`, and `og:image` metadata with direct `<meta http-equiv="refresh">` fallback instead of generic empty fragment pages.
+  - Regular browser visitors continue to receive instant `HTTP 307 Temporary Redirect` directly to Delta Chat invite links.
+- **Dynamic OpenGraph Images, Avatars, & Web Cards**:
+  - `GET /{username}/og.png`: Generates crisp 1200x630 OpenGraph cards using Pillow with fast in-memory LRU caching and HTTP cache headers.
+  - `GET /{username}/og.svg` & `GET /{username}/avatar.svg`: Generates scalable vector avatars with deterministic colors based on key fingerprints.
+  - `GET /{username}/card`: Dedicated web verification page with QR code, formatted fingerprint, email, identicon, and one-click chat launcher.
+  - Automatic cache invalidation when usernames are claimed, modified, or unlinked.
+
+---
+
 ## [1.4.4] - 2026-07-26
 
 ### Fixed

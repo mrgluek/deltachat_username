@@ -7,6 +7,9 @@ A Delta Chat bot and FastAPI web service for registering custom usernames and ge
 ## ✨ Features
 
 - 👤 **Custom Usernames**: Claim a short username (`/username myname`) for your personal profile or group chat.
+- 🔐 **Visual Cryptographic Verification**: Anti-impersonation verification displaying 10-group formatted PGP fingerprints, 5x5 symmetric Unicode block Identicons, and 5-emoji visual badges.
+- 🖼️ **Social OpenGraph & Twitter Cards**: Smart crawler detection serving rich metadata and cached dynamic PNG cards (`1200x630`) on Telegram, Discord, Twitter, WhatsApp, etc.
+- 📇 **Web Profile Cards & Avatars**: Dynamic endpoints (`/{username}/og.png`, `/{username}/avatar.svg`, and `/{username}/card`) for visual badges, QR codes, and web verification.
 - ⚡️ **Group Chat Auto-Binding**: Use `/username myname` directly inside any group chat — the bot instantly generates the group's invite URL without manual link pasting.
 - 🔀 **HTTP 307 Temporary Redirect**: Guarantees browsers and proxies always fetch the newest invite link without aggressive caching.
 - 🌐 **Web Landing Page**: Beautiful dark-mode glassmorphism interface on `GET /` displaying bot description, QR code, and interactive command hints.
