@@ -10,6 +10,7 @@ Provides:
 
 import hashlib
 import io
+import os
 import re
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional
@@ -324,12 +325,17 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
 
     rects_svg = "\n        ".join(identicon_rects)
 
+    # Font family definitions with broad cross-platform support (Linux DejaVu/Liberation, macOS System, Windows)
+    sans_font = "DejaVu Sans, Liberation Sans, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+    mono_font = "DejaVu Sans Mono, Liberation Mono, Menlo, Monaco, Consolas, Courier New, monospace"
+    emoji_font = "Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, Android Emoji, EmojiSymbols, sans-serif"
+
     emojis = metadata.get("emoji_hash", "").split()
     emoji_tags = []
     for i, em in enumerate(emojis):
         cx = 80 + 20 + i * 40
         emoji_tags.append(
-            f'<text x="{cx}" y="440" font-family="-apple-system, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji" font-size="32" text-anchor="middle">{em}</text>'
+            f'<text x="{cx}" y="440" font-family="{emoji_font}" font-size="32" text-anchor="middle">{em}</text>'
         )
     emojis_svg = "\n    ".join(emoji_tags)
 
@@ -353,9 +359,9 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
 
     <!-- Header Badge -->
     <rect x="90" y="90" width="160" height="40" rx="20" fill="rgba(56,189,248,0.15)" />
-    <text x="170" y="116" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="bold" fill="#38bdf8" text-anchor="middle">DELTA CHAT</text>
+    <text x="170" y="116" font-family="{sans_font}" font-size="16" font-weight="bold" fill="#38bdf8" text-anchor="middle">DELTA CHAT</text>
 
-    <text x="270" y="116" font-family="-apple-system, system-ui, sans-serif" font-size="16" fill="#94a3b8">{target_type} • Linked: {rel_time}</text>
+    <text x="270" y="116" font-family="{sans_font}" font-size="16" fill="#94a3b8">{target_type} • Linked: {rel_time}</text>
 
     <!-- Identicon Frame -->
     <rect x="80" y="180" width="200" height="200" rx="16" fill="rgba(15,23,42,0.6)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
@@ -364,23 +370,23 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
     </g>
 
     <!-- Info Column -->
-    <text x="320" y="215" font-family="-apple-system, system-ui, sans-serif" font-size="44" font-weight="800" fill="#f8fafc">{name}</text>
-    <text x="320" y="260" font-family="-apple-system, system-ui, sans-serif" font-size="26" font-weight="600" fill="#38bdf8">@{username}</text>
+    <text x="320" y="215" font-family="{sans_font}" font-size="44" font-weight="800" fill="#f8fafc">{name}</text>
+    <text x="320" y="260" font-family="{sans_font}" font-size="26" font-weight="600" fill="#38bdf8">@{username}</text>
 
     <!-- Email -->
-    <text x="320" y="315" font-family="-apple-system, system-ui, sans-serif" font-size="20" fill="#94a3b8">Email: <tspan font-family="monospace" fill="#e2e8f0">{email or "Not specified"}</tspan></text>
+    <text x="320" y="315" font-family="{sans_font}" font-size="20" fill="#94a3b8">Email: <tspan font-family="{mono_font}" fill="#e2e8f0">{email or "Not specified"}</tspan></text>
 
     <!-- Fingerprint Box -->
     <rect x="320" y="340" width="790" height="110" rx="12" fill="rgba(15,23,42,0.7)" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
-    <text x="340" y="372" font-family="-apple-system, system-ui, sans-serif" font-size="15" font-weight="bold" fill="#94a3b8">🔐 CRYPTOGRAPHIC FINGERPRINT</text>
-    <text x="340" y="405" font-family="monospace" font-size="20" font-weight="bold" fill="#38bdf8" letter-spacing="2">{line1}</text>
-    <text x="340" y="435" font-family="monospace" font-size="20" font-weight="bold" fill="#38bdf8" letter-spacing="2">{line2}</text>
+    <text x="340" y="372" font-family="{sans_font}" font-size="15" font-weight="bold" fill="#94a3b8">🔐 CRYPTOGRAPHIC FINGERPRINT</text>
+    <text x="340" y="405" font-family="{mono_font}" font-size="20" font-weight="bold" fill="#38bdf8" letter-spacing="2">{line1}</text>
+    <text x="340" y="435" font-family="{mono_font}" font-size="20" font-weight="bold" fill="#38bdf8" letter-spacing="2">{line2}</text>
 
     <!-- Emojis aligned under Identicon -->
     {emojis_svg}
 
     <line x1="90" y1="490" x2="1110" y2="490" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
-    <text x="90" y="535" font-family="-apple-system, system-ui, sans-serif" font-size="18" fill="#64748b">Verified invite short link: <tspan fill="#38bdf8">{base_url}/{username}</tspan></text>
+    <text x="90" y="535" font-family="{sans_font}" font-size="18" fill="#64748b">Verified invite short link: <tspan fill="#38bdf8">{base_url}/{username}</tspan></text>
 </svg>"""
     return svg
 
@@ -402,7 +408,19 @@ def generate_og_png_bytes(username: str, metadata: Dict[str, Any], base_url: str
 
     if HAS_RESVG:
         try:
-            png_bytes = resvg_py.svg_to_bytes(svg_text)
+            # Common Linux and macOS font directories
+            search_dirs = [
+                "/usr/share/fonts",
+                "/usr/local/share/fonts",
+                "/usr/share/fonts/truetype",
+                "/System/Library/Fonts",
+                "/Library/Fonts",
+            ]
+            valid_dirs = [d for d in search_dirs if os.path.exists(d)]
+            png_bytes = resvg_py.svg_to_bytes(
+                svg_text,
+                font_dirs=valid_dirs if valid_dirs else None,
+            )
             if len(_PNG_CACHE) >= _PNG_CACHE_MAX_ITEMS:
                 _PNG_CACHE.pop(next(iter(_PNG_CACHE)))
             _PNG_CACHE[cache_key] = png_bytes

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.2] - 2026-08-21
+
+### Fixed
+- **Font Rendering in Docker Linux Environment**:
+  - Added `fontconfig`, `fonts-dejavu`, `fonts-dejavu-core`, `fonts-liberation`, and `fonts-noto-color-emoji` to `Dockerfile`.
+  - Configured explicit cross-platform font family fallbacks (`DejaVu Sans`, `Liberation Sans`) and font directory scanning (`/usr/share/fonts`, `/usr/share/fonts/truetype`) in `identicon.py`.
+  - Fixed issue where minimal Debian Linux container lacked font files causing SVG text to be omitted during PNG rasterization.
+
+---
+
 ## [1.5.1] - 2026-08-21
 
 ### Fixed & Improved
