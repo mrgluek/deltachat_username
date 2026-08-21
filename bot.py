@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -82,12 +82,18 @@ CRAWLER_USER_AGENTS = [
     "mastodon", "matrix", "embedly", "quora link preview", "outbrain",
     "pinterest", "skypeuripreview",
 ]
+TELEGRAM_IP_PREFIXES = ("149.154.", "91.108.", "95.161.")
 
 
 def is_crawler_request(request: Request) -> bool:
     """Detect if request comes from a social media crawler or preview generator."""
     ua = request.headers.get("user-agent", "").lower()
-    return any(crawler in ua for crawler in CRAWLER_USER_AGENTS)
+    if any(crawler in ua for crawler in CRAWLER_USER_AGENTS):
+        return True
+    client_ip = get_client_ip(request)
+    if any(client_ip.startswith(prefix) for prefix in TELEGRAM_IP_PREFIXES):
+        return True
+    return False
 
 
 def format_username_card_text(username: str, invite_link: str, updated_at_iso: str, base_url: str) -> str:
@@ -755,7 +761,7 @@ def redirect_username(username: str, request: Request):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{og_title}</title>
     <!-- OpenGraph / Facebook / Telegram / Discord -->
-    <meta property="og:type" content="profile">
+    <meta property="og:type" content="website">
     <meta property="og:site_name" content="Delta Chat Username Service">
     <meta property="og:title" content="{og_title}">
     <meta property="og:description" content="{og_desc}">

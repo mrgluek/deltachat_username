@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.4] - 2026-08-21
+
+### Fixed
+- **Telegram IP Detection & OpenGraph Type**:
+  - Added Telegram ASN IP prefix checking (`149.154.*`, `91.108.*`, `95.161.*`) in `is_crawler_request` for guaranteed crawler identification.
+  - Switched `og:type` to `website` for universal summary card compatibility in Telegram and other chat platforms.
+
+---
+
 ## [1.5.3] - 2026-08-21
 
 ### Fixed
