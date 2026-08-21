@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.1] - 2026-08-21
+
+### Fixed & Improved
+- **Pixel-Perfect PNG OpenGraph Cards (`resvg-py`)**:
+  - Integrated `resvg-py` (Rust-based standalone SVG engine) for generating OpenGraph PNG cards identical to browser SVG rendering.
+  - Eliminated bitmap font degradation and missing glyphs on Linux/Docker environments.
+- **Emoji Visual Badge Alignment**:
+  - Enlarged emoji font size to 32px and spaced them evenly across the full width of the identicon box (`x=80` to `x=280`).
+
+---
+
 ## [1.5.0] - 2026-08-21
 
 ### Added

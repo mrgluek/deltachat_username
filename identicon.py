@@ -16,6 +16,12 @@ from typing import Dict, Any, Tuple, Optional
 from urllib.parse import parse_qs, unquote
 
 try:
+    import resvg_py
+    HAS_RESVG = True
+except ImportError:
+    HAS_RESVG = False
+
+try:
     from PIL import Image, ImageDraw, ImageFont
     HAS_PIL = True
 except ImportError:
@@ -318,6 +324,15 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
 
     rects_svg = "\n        ".join(identicon_rects)
 
+    emojis = metadata.get("emoji_hash", "").split()
+    emoji_tags = []
+    for i, em in enumerate(emojis):
+        cx = 80 + 20 + i * 40
+        emoji_tags.append(
+            f'<text x="{cx}" y="440" font-family="-apple-system, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji" font-size="32" text-anchor="middle">{em}</text>'
+        )
+    emojis_svg = "\n    ".join(emoji_tags)
+
     svg = f"""<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
     <defs>
         <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -361,8 +376,8 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
     <text x="340" y="405" font-family="monospace" font-size="20" font-weight="bold" fill="#38bdf8" letter-spacing="2">{line1}</text>
     <text x="340" y="435" font-family="monospace" font-size="20" font-weight="bold" fill="#38bdf8" letter-spacing="2">{line2}</text>
 
-    <!-- Footer Bar -->
-    <text x="90" y="440" font-family="-apple-system, system-ui, sans-serif" font-size="24" fill="#ffffff">{emoji_hash}</text>
+    <!-- Emojis aligned under Identicon -->
+    {emojis_svg}
 
     <line x1="90" y1="490" x2="1110" y2="490" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
     <text x="90" y="535" font-family="-apple-system, system-ui, sans-serif" font-size="18" fill="#64748b">Verified invite short link: <tspan fill="#38bdf8">{base_url}/{username}</tspan></text>
@@ -372,7 +387,8 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
 
 def generate_og_png_bytes(username: str, metadata: Dict[str, Any], base_url: str = "https://d.gluek.info") -> bytes:
     """
-    Generate crisp 1200x630 PNG card using Pillow, with fast in-memory caching.
+    Generate crisp 1200x630 PNG card using resvg (matching browser SVG exactly),
+    with Pillow fallback and fast in-memory caching.
     Guarantees full compatibility across Telegram, WhatsApp, Twitter, Discord, iMessage.
     """
     fp = metadata.get("fingerprint", "")
@@ -382,8 +398,19 @@ def generate_og_png_bytes(username: str, metadata: Dict[str, Any], base_url: str
     if cache_key in _PNG_CACHE:
         return _PNG_CACHE[cache_key]
 
+    svg_text = generate_svg_card(username, metadata, base_url=base_url)
+
+    if HAS_RESVG:
+        try:
+            png_bytes = resvg_py.svg_to_bytes(svg_text)
+            if len(_PNG_CACHE) >= _PNG_CACHE_MAX_ITEMS:
+                _PNG_CACHE.pop(next(iter(_PNG_CACHE)))
+            _PNG_CACHE[cache_key] = png_bytes
+            return png_bytes
+        except Exception:
+            pass
+
     if not HAS_PIL:
-        # Fallback empty PNG if PIL is not installed
         return b""
 
     width, height = 1200, 630
