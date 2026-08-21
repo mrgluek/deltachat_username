@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] - 2026-08-22
+
+### Added & Improved
+- **Primary Domain `deltachat.id` & Dynamic Multi-Domain Support**:
+  - Configured default base URL to `https://deltachat.id`.
+  - Added dynamic request host detection (`get_request_base_url`) in web endpoints. The bot now automatically serves OpenGraph metadata, card previews, and SVG/PNG badges using whichever domain the client connected to (`deltachat.id` or `d.gluek.info`).
+  - Updated `Caddyfile` with dual-domain reverse proxy (`deltachat.id, d.gluek.info`) and `www.deltachat.id` redirect.
+  - Updated `docker-compose.yml`, `.env.example`, and `README.md`.
+
+---
+
 ## [1.5.5] - 2026-08-22
 
 ### Fixed

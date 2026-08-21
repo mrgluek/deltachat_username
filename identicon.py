@@ -295,7 +295,7 @@ def get_color_from_fingerprint(hex_fp: str) -> Tuple[int, int, int]:
     return (r, g, b)
 
 
-def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "https://d.gluek.info") -> str:
+def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "https://deltachat.id") -> str:
     """Generate a clean, scalable SVG card (1200x630) for web and OpenGraph preview."""
     fp = metadata.get("fingerprint", "")
     line1, line2 = metadata.get("formatted_fp", ("", ""))
@@ -413,7 +413,7 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
     return svg
 
 
-def generate_og_png_bytes(username: str, metadata: Dict[str, Any], base_url: str = "https://d.gluek.info") -> bytes:
+def generate_og_png_bytes(username: str, metadata: Dict[str, Any], base_url: str = "https://deltachat.id") -> bytes:
     """
     Generate crisp 1200x630 PNG card using resvg (matching browser SVG exactly),
     with Pillow fallback and fast in-memory caching.

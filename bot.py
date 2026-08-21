@@ -23,12 +23,21 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.5.5"
+VERSION = "1.6.0"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
 
-BASE_URL = os.getenv("BASE_URL", "https://d.gluek.info").rstrip("/")
+BASE_URL = os.getenv("BASE_URL", "https://deltachat.id").rstrip("/")
+
+
+def get_request_base_url(request: Request) -> str:
+    """Extract public base URL dynamically from incoming request headers or fallback to configured BASE_URL."""
+    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme or "https")
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if host:
+        return f"{forwarded_proto}://{host}".rstrip("/")
+    return database.get_config("base_url") or BASE_URL
 
 # --- IN-MEMORY RATE LIMITER FOR GET /{username} ---
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "10"))
@@ -739,7 +748,7 @@ def redirect_username(username: str, request: Request):
 
     if claim and claim.get("invite_link"):
         target_link = rewrite_invite_link(claim["invite_link"])
-        base_url = database.get_config("base_url") or BASE_URL
+        base_url = get_request_base_url(request)
         metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
 
         # If crawler or explicit preview requested, return full OpenGraph HTML metadata
@@ -853,13 +862,13 @@ def redirect_username(username: str, request: Request):
 
 
 @app.get("/{username}/og.png")
-def get_username_og_png(username: str):
+def get_username_og_png(username: str, request: Request):
     clean_username = username.strip().lower()
     claim = database.get_username_claim(clean_username)
     if not claim or not claim.get("invite_link"):
         return Response(status_code=404)
 
-    base_url = database.get_config("base_url") or BASE_URL
+    base_url = get_request_base_url(request)
     metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
     png_bytes = identicon.generate_og_png_bytes(clean_username, metadata, base_url=base_url)
     if not png_bytes:
@@ -874,13 +883,13 @@ def get_username_og_png(username: str):
 
 @app.get("/{username}/og.svg")
 @app.get("/{username}/avatar.svg")
-def get_username_avatar_svg(username: str):
+def get_username_avatar_svg(username: str, request: Request):
     clean_username = username.strip().lower()
     claim = database.get_username_claim(clean_username)
     if not claim or not claim.get("invite_link"):
         return Response(status_code=404)
 
-    base_url = database.get_config("base_url") or BASE_URL
+    base_url = get_request_base_url(request)
     metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
     svg_text = identicon.generate_svg_card(clean_username, metadata, base_url=base_url)
 
@@ -892,13 +901,13 @@ def get_username_avatar_svg(username: str):
 
 
 @app.get("/{username}/card", response_class=HTMLResponse)
-def get_username_card_page(username: str):
+def get_username_card_page(username: str, request: Request):
     clean_username = username.strip().lower()
     claim = database.get_username_claim(clean_username)
     if not claim or not claim.get("invite_link"):
         return Response(status_code=404)
 
-    base_url = database.get_config("base_url") or BASE_URL
+    base_url = get_request_base_url(request)
     target_link = rewrite_invite_link(claim["invite_link"])
     metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
     qr_img = generate_qr_data_uri(target_link)

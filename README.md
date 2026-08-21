@@ -1,6 +1,6 @@
 # 🔗 Delta Chat Username & Short Link Bot (`deltachat_username`)
 
-A Delta Chat bot and FastAPI web service for registering custom usernames and generating short invite links (`https://d.gluek.info/<username>`) that redirect (via HTTP 307 Temporary Redirect) to standard Delta Chat invite URLs (`https://i.delta.chat/#...`).
+A Delta Chat bot and FastAPI web service for registering custom usernames and generating short invite links (`https://deltachat.id/<username>`) that redirect (via HTTP 307 Temporary Redirect) to standard Delta Chat invite URLs (`https://i.delta.chat/#...`).
 
 ---
 
@@ -73,7 +73,7 @@ Send `/initadmin` to the bot in a private message in Delta Chat to complete admi
 | `/help` | All | Show command help and bot info. |
 | `/donate` | All | Support bot development. |
 | `/initadmin` | Admin | Claim administrative ownership. |
-| `/url <url>` | Admin | Set base domain URL (`https://d.gluek.info`). |
+| `/url <url>` | Admin | Set base domain URL (`https://deltachat.id`). |
 | `/inviteurl <url>` | Admin | Set custom invite base URL/mirror (`https://i.gluek.info/#`). |
 | `/stats` | Admin | Show registered usernames and database stats. |
 | `/transports` | Admin | List configured mail relays and statistics. |
@@ -85,8 +85,12 @@ Send `/initadmin` to the bot in a private message in Delta Chat to complete admi
 Add to your `/etc/caddy/Caddyfile`:
 
 ```caddy
-d.gluek.info {
+deltachat.id, d.gluek.info {
     reverse_proxy 127.0.0.1:8080
+}
+
+www.deltachat.id {
+    redir https://deltachat.id{uri} permanent
 }
 ```
 

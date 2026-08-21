@@ -1,3 +1,8 @@
-d.gluek.info {
+deltachat.id, d.gluek.info {
     reverse_proxy 127.0.0.1:8080
 }
+
+www.deltachat.id {
+    redir https://deltachat.id{uri} permanent
+}
+
