@@ -109,15 +109,17 @@ class TestIdenticon(unittest.TestCase):
         self.assertIn("19 Aug 2026", meta["relative_time"])
 
     def test_parse_group_and_channel_metadata(self):
-        group_url = "https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&g=group_invite&s=sig&n=My+Group"
+        group_url = "https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&g=Chat+RU&s=sig&n=Username+Bot"
         meta_group = identicon.parse_invite_metadata(group_url)
         self.assertEqual(meta_group["target_type"], "group")
-        self.assertEqual(meta_group["display_name"], "My Group")
+        self.assertEqual(meta_group["display_name"], "Chat RU")
+        self.assertEqual(meta_group["inviter_name"], "Username Bot")
 
-        channel_url = "https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&b=1&s=sig&n=My+Channel"
+        channel_url = "https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&b=News+Channel&s=sig&n=Author"
         meta_channel = identicon.parse_invite_metadata(channel_url)
         self.assertEqual(meta_channel["target_type"], "channel")
-        self.assertEqual(meta_channel["display_name"], "My Channel")
+        self.assertEqual(meta_channel["display_name"], "News Channel")
+        self.assertEqual(meta_channel["inviter_name"], "Author")
 
     def test_generate_svg_card(self):
         url = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=t&s=s&a=test%40example.com&n=Gluek"

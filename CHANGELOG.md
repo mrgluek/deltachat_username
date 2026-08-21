@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.5] - 2026-08-22
+
+### Fixed
+- **Group & Channel Name Resolution**:
+  - In group invite links (`&g=...`), prioritized group title over inviter's display name (`&n=...`).
+  - In channel invite links (`&b=...`), prioritized broadcast title over sender's display name (`&n=...`).
+  - Formatted verification cards to display `👥 Group: <Group Name>` and `📢 Channel: <Channel Name>` without displaying the inviter's personal email.
+
+---
+
 ## [1.5.4] - 2026-08-21
 
 ### Fixed

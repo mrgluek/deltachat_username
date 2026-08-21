@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -110,16 +110,17 @@ def format_username_card_text(username: str, invite_link: str, updated_at_iso: s
     if metadata.get("relative_time"):
         lines.append(f"📅 **Linked:** {metadata['relative_time']}")
 
-    if metadata.get("email"):
-        lines.append(f"📧 **Email:** `{metadata['email']}`")
-
-    if metadata.get("display_name"):
-        target_type = metadata.get("target_type", "contact")
-        if target_type == "group":
+    target_type = metadata.get("target_type", "contact")
+    if target_type == "group":
+        if metadata.get("display_name"):
             lines.append(f"👥 **Group:** {metadata['display_name']}")
-        elif target_type == "channel":
+    elif target_type == "channel":
+        if metadata.get("display_name"):
             lines.append(f"📢 **Channel:** {metadata['display_name']}")
-        else:
+    else:
+        if metadata.get("email"):
+            lines.append(f"📧 **Email:** `{metadata['email']}`")
+        if metadata.get("display_name"):
             lines.append(f"👤 **Name:** {metadata['display_name']}")
 
     line1, line2 = metadata.get("formatted_fp", ("", ""))
@@ -746,8 +747,15 @@ def redirect_username(username: str, request: Request):
             title_name = metadata.get("display_name") or clean_username
             og_title = f"{title_name} (@{clean_username}) • Delta Chat"
             fp_l1, fp_l2 = metadata.get("formatted_fp", ("", ""))
+            if metadata.get("target_type") == "group":
+                target_desc = f"👥 Group: {metadata.get('display_name')}"
+            elif metadata.get("target_type") == "channel":
+                target_desc = f"📢 Channel: {metadata.get('display_name')}"
+            else:
+                target_desc = f"📧 {metadata.get('email') or 'Delta Chat User'}"
+
             og_desc = (
-                f"📧 {metadata.get('email') or 'Delta Chat User'} • "
+                f"{target_desc} • "
                 f"🔐 FP: {fp_l1} • "
                 f"🛡️ {metadata.get('emoji_hash')} • "
                 f"📅 Linked: {metadata.get('relative_time')}"

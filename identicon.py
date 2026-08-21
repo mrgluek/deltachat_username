@@ -248,16 +248,28 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
         params = parse_qs(query_str)
         if "a" in params and params["a"][0]:
             result["email"] = unquote(params["a"][0].strip())
-        if "n" in params and params["n"][0]:
-            result["display_name"] = unquote(params["n"][0].strip())
 
-        # Determine target type
+        # Determine target type & primary display name
         if "g" in params and params["g"][0]:
             result["target_type"] = "group"
-        elif "b" in params or ("x" in params and "j" in params):
+            result["group_name"] = unquote(params["g"][0].strip())
+            result["display_name"] = result["group_name"]
+            if "n" in params and params["n"][0]:
+                result["inviter_name"] = unquote(params["n"][0].strip())
+        elif "b" in params and params["b"][0]:
             result["target_type"] = "channel"
+            result["channel_name"] = unquote(params["b"][0].strip())
+            result["display_name"] = result["channel_name"]
+            if "n" in params and params["n"][0]:
+                result["inviter_name"] = unquote(params["n"][0].strip())
+        elif "x" in params and "j" in params:
+            result["target_type"] = "channel"
+            if "n" in params and params["n"][0]:
+                result["display_name"] = unquote(params["n"][0].strip())
         else:
             result["target_type"] = "contact"
+            if "n" in params and params["n"][0]:
+                result["display_name"] = unquote(params["n"][0].strip())
 
     return result
 
@@ -291,7 +303,17 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
     name = metadata.get("display_name", username)
     emoji_hash = metadata.get("emoji_hash", "")
     rel_time = metadata.get("relative_time", "")
-    target_type = metadata.get("target_type", "contact").capitalize()
+    target_type_raw = metadata.get("target_type", "contact")
+    target_type = target_type_raw.capitalize()
+    if target_type_raw == "group":
+        detail_label = "Group"
+        detail_val = name
+    elif target_type_raw == "channel":
+        detail_label = "Channel"
+        detail_val = name
+    else:
+        detail_label = "Email"
+        detail_val = email or "Not specified"
 
     fg_r, fg_g, fg_b = get_color_from_fingerprint(fp)
     fg_color = f"rgb({fg_r}, {fg_g}, {fg_b})"
@@ -373,8 +395,8 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
     <text x="320" y="215" font-family="{sans_font}" font-size="44" font-weight="800" fill="#f8fafc">{name}</text>
     <text x="320" y="260" font-family="{sans_font}" font-size="26" font-weight="600" fill="#38bdf8">@{username}</text>
 
-    <!-- Email -->
-    <text x="320" y="315" font-family="{sans_font}" font-size="20" fill="#94a3b8">Email: <tspan font-family="{mono_font}" fill="#e2e8f0">{email or "Not specified"}</tspan></text>
+    <!-- Details -->
+    <text x="320" y="315" font-family="{sans_font}" font-size="20" fill="#94a3b8">{detail_label}: <tspan font-family="{mono_font}" fill="#e2e8f0">{detail_val}</tspan></text>
 
     <!-- Fingerprint Box -->
     <rect x="320" y="340" width="790" height="110" rx="12" fill="rgba(15,23,42,0.7)" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
