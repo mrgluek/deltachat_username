@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.1] - 2026-08-22
+
+### Fixed
+- **WebPreviewBot & Link Preview Scraper Detection**:
+  - Expanded crawler User-Agent recognition in `is_crawler_request` to include `webpreview`, `deltachat`, `requests`, `httpx`, `bot`, `preview`, `scraper`, and empty User-Agent clients.
+  - Prevents Delta Chat `WebPreview Bot` and automated preview fetchers from following HTTP 307 redirects to `i.deltachat.id`, ensuring they receive full custom OpenGraph verification cards.
+
+---
+
 ## [1.6.0] - 2026-08-22
 
 ### Added & Improved

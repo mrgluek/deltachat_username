@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -89,14 +89,20 @@ CRAWLER_USER_AGENTS = [
     "slackbot", "whatsapp", "vkshare", "w3c_validator", "redditbot",
     "applebot", "bingbot", "googlebot", "yandex", "linkedinbot",
     "mastodon", "matrix", "embedly", "quora link preview", "outbrain",
-    "pinterest", "skypeuripreview",
+    "pinterest", "skypeuripreview", "webpreview", "deltachat",
+    "preview", "bot", "crawler", "spider", "scraper", "fetch",
+    "curl", "wget", "http-client", "python", "requests", "httpx",
+    "aiohttp", "urllib", "axios", "got", "node", "ruby",
+    "go-http-client", "java", "okhttp", "libwww", "feed",
 ]
 TELEGRAM_IP_PREFIXES = ("149.154.", "91.108.", "95.161.")
 
 
 def is_crawler_request(request: Request) -> bool:
-    """Detect if request comes from a social media crawler or preview generator."""
+    """Detect if request comes from a social media crawler, preview bot, or scraper."""
     ua = request.headers.get("user-agent", "").lower()
+    if not ua:
+        return True
     if any(crawler in ua for crawler in CRAWLER_USER_AGENTS):
         return True
     client_ip = get_client_ip(request)
