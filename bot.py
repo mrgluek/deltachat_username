@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.6.1"
+VERSION = "1.6.2"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -757,33 +757,31 @@ def redirect_username(username: str, request: Request):
         base_url = get_request_base_url(request)
         metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
 
-        # If crawler or explicit preview requested, return full OpenGraph HTML metadata
-        if is_crawler_request(request) or request.query_params.get("preview") == "1":
-            title_name = metadata.get("display_name") or clean_username
-            og_title = f"{title_name} (@{clean_username}) • Delta Chat"
-            fp_l1, fp_l2 = metadata.get("formatted_fp", ("", ""))
-            if metadata.get("target_type") == "group":
-                target_desc = f"👥 Group: {metadata.get('display_name')}"
-            elif metadata.get("target_type") == "channel":
-                target_desc = f"📢 Channel: {metadata.get('display_name')}"
-            else:
-                target_desc = f"📧 {metadata.get('email') or 'Delta Chat User'}"
+        title_name = metadata.get("display_name") or clean_username
+        og_title = f"{title_name} (@{clean_username}) • Delta Chat"
+        fp_l1, fp_l2 = metadata.get("formatted_fp", ("", ""))
+        if metadata.get("target_type") == "group":
+            target_desc = f"👥 Group: {metadata.get('display_name')}"
+        elif metadata.get("target_type") == "channel":
+            target_desc = f"📢 Channel: {metadata.get('display_name')}"
+        else:
+            target_desc = f"📧 {metadata.get('email') or 'Delta Chat User'}"
 
-            og_desc = (
-                f"{target_desc} • "
-                f"🔐 FP: {fp_l1} • "
-                f"🛡️ {metadata.get('emoji_hash')} • "
-                f"📅 Linked: {metadata.get('relative_time')}"
-            )
-            og_img = f"{base_url}/{clean_username}/og.png"
+        og_desc = (
+            f"{target_desc} • "
+            f"🔐 FP: {fp_l1} • "
+            f"🛡️ {metadata.get('emoji_hash')} • "
+            f"📅 Linked: {metadata.get('relative_time')}"
+        )
+        og_img = f"{base_url}/{clean_username}/og.png"
 
-            html = f"""<!DOCTYPE html>
+        html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{og_title}</title>
-    <!-- OpenGraph / Facebook / Telegram / Discord -->
+    <!-- OpenGraph / Facebook / Telegram / Discord / WebPreview -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Delta Chat Username Service">
     <meta property="og:title" content="{og_title}">
@@ -799,6 +797,11 @@ def redirect_username(username: str, request: Request):
     <meta name="twitter:description" content="{og_desc}">
     <meta name="twitter:image" content="{og_img}">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script>
+        if (!window.location.search.includes("preview=1")) {{
+            window.location.replace("{target_link}");
+        }}
+    </script>
     <style>
         body {{
             background: #0f172a; color: #f8fafc;
@@ -830,9 +833,7 @@ def redirect_username(username: str, request: Request):
 </body>
 </html>
 """
-            return HTMLResponse(content=html, status_code=200)
-
-        return RedirectResponse(url=target_link, status_code=307)
+        return HTMLResponse(content=html, status_code=200)
 
     html = f"""<!DOCTYPE html>
 <html lang="en">

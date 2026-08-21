@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] - 2026-08-22
+
+### Fixed & Improved
+- **Universal OpenGraph 200 OK Delivery**:
+  - Replaced conditional HTTP 307 redirect on `GET /{username}` with standard universal 200 OK delivery containing full OpenGraph and Twitter Card metadata alongside an instant client-side JavaScript redirect (`window.location.replace`).
+  - Guarantees that all automated link previewers (Delta Chat WebPreview Bot, scrapers, messengers) receive complete OpenGraph metadata without being redirected to `i.deltachat.id`, regardless of the User-Agent used.
+
+---
+
 ## [1.6.1] - 2026-08-22
 
 ### Fixed

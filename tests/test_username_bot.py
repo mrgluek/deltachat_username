@@ -163,34 +163,36 @@ class TestUsernameBot(unittest.TestCase):
         res = self.client.get("/nonexistent")
         self.assertEqual(res.status_code, 404)
 
-        # Even if stored as official i.delta.chat in DB, HTTP 307 redirect must dynamically rewrite to i.gluek.info
+        # Even if stored as official i.delta.chat in DB, the returned HTML must dynamically rewrite target_link
         old_official_link = "https://i.delta.chat/#ABC12345?v=3&i=1&s=2&a=test&n=test"
         database.claim_username("doesnm", old_official_link, "chat_100")
 
-        res = self.client.get("/doesnm", follow_redirects=False)
-        self.assertEqual(res.status_code, 307)
-        self.assertEqual(res.headers["location"], "https://i.gluek.info/#ABC12345?v=3&i=1&s=2&a=test&n=test")
+        res = self.client.get("/doesnm")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("https://i.gluek.info/#ABC12345?v=3&i=1&s=2&a=test&n=test", res.text)
+        self.assertIn("window.location.replace", res.text)
 
     def test_rate_limiting_get_username(self):
         clear_rate_limits()
 
-        # First 10 requests within window should succeed (returning 404 or 307)
+        # First 10 requests within window should succeed (returning 404 or 200)
         for i in range(10):
             res = self.client.get(f"/test_uname_{i}")
-            self.assertIn(res.status_code, (404, 307))
+            self.assertIn(res.status_code, (404, 200))
 
     def test_crawler_opengraph_preview_and_meta_tags(self):
         link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
         database.claim_username("gluek", link, "chat_100")
 
-        # 1. Normal Browser User-Agent should get 307 Redirect
+        # 1. Normal Browser User-Agent should get 200 OK with OpenGraph tags and JS redirect
         res_browser = self.client.get(
             "/gluek",
             headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
-            follow_redirects=False,
         )
-        self.assertEqual(res_browser.status_code, 307)
-        self.assertTrue(res_browser.headers["location"].startswith("https://i.gluek.info/#"))
+        self.assertEqual(res_browser.status_code, 200)
+        self.assertIn("og:title", res_browser.text)
+        self.assertIn("og:image", res_browser.text)
+        self.assertIn("window.location.replace", res_browser.text)
 
         # 2. TelegramBot Crawler User-Agent should get 200 OK with rich OpenGraph tags
         res_tg = self.client.get("/gluek", headers={"User-Agent": "TelegramBot (like TwitterBot)"})
