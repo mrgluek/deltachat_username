@@ -19,7 +19,7 @@ services:
       - DC_DB_DIR=/app/data
       - DB_PATH=/app/data/username.db
       - BASE_URL=https://deltachat.id
-      - INVITE_BASE_URL=https://i.gluek.info/#
+      - INVITE_BASE_URL=https://i.deltachat.id/#
       - DISPLAY_NAME
       - STATUS_TEXT
       - AVATAR_PATH
