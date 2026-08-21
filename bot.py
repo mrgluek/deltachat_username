@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.5.2"
+VERSION = "1.5.3"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -689,8 +689,9 @@ def health_check():
 
 
 @app.get("/{username}")
+@app.get("/{username}/")
 def redirect_username(username: str, request: Request):
-    clean_username = username.strip().lower()
+    clean_username = username.strip("/").strip().lower()
 
     # Rate Limit Check (10 requests per minute per IP)
     client_ip = get_client_ip(request)
@@ -768,7 +769,6 @@ def redirect_username(username: str, request: Request):
     <meta name="twitter:title" content="{og_title}">
     <meta name="twitter:description" content="{og_desc}">
     <meta name="twitter:image" content="{og_img}">
-    <meta http-equiv="refresh" content="0; url={target_link}">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         body {{

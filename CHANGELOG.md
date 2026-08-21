@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.3] - 2026-08-21
+
+### Fixed
+- **Telegram & Messenger OpenGraph Card Unfurling**:
+  - Removed `<meta http-equiv="refresh">` from the crawler HTML response. Previously, Telegram's WebPage crawler followed the meta-refresh target (`i.gluek.info`) instead of using the custom OpenGraph tags on `d.gluek.info`.
+  - Added support for trailing slash URLs (`GET /{username}/`).
+
+---
+
 ## [1.5.2] - 2026-08-21
 
 ### Fixed
