@@ -14,7 +14,7 @@ import os
 import re
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional
-from urllib.parse import parse_qs, unquote
+from urllib.parse import parse_qs, unquote, quote_plus
 
 try:
     import resvg_py
@@ -272,6 +272,68 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
                 result["display_name"] = unquote(params["n"][0].strip())
 
     return result
+
+
+def update_invite_link_contact_info(
+    invite_link: str,
+    new_email: Optional[str] = None,
+    new_display_name: Optional[str] = None,
+) -> Tuple[str, bool]:
+    """
+    Updates email and display_name parameters in a personal Delta Chat invite link if changed.
+    Preserves cryptographic tokens, keys, and formatting.
+    Returns (updated_link, is_changed).
+    """
+    if not invite_link or "/#" not in invite_link:
+        return invite_link, False
+
+    prefix, frag = invite_link.split("/#", 1)
+    if "&" not in frag and "?" not in frag:
+        return invite_link, False
+
+    sep = "&" if "&" in frag else "?"
+    parts = frag.split(sep, 1)
+    fp_part = parts[0]
+    query_str = parts[1]
+
+    params = parse_qs(query_str, keep_blank_values=True)
+    changed = False
+
+    # Do not mutate group or channel invite links
+    if "g" in params or "b" in params:
+        return invite_link, False
+
+    if new_email and new_email.strip():
+        clean_email = new_email.strip()
+        current_email = unquote(params.get("a", [""])[0])
+        if current_email != clean_email:
+            params["a"] = [clean_email]
+            changed = True
+
+    if new_display_name and new_display_name.strip():
+        clean_name = new_display_name.strip()
+        current_name = unquote(params.get("n", [""])[0])
+        if current_name != clean_name:
+            params["n"] = [clean_name]
+            changed = True
+
+    if not changed:
+        return invite_link, False
+
+    ordered_keys = ["v", "x", "i", "s", "a", "n"]
+    query_parts = []
+    for k in ordered_keys:
+        if k in params:
+            for v in params[k]:
+                query_parts.append(f"{k}={quote_plus(v)}")
+    for k, vals in params.items():
+        if k not in ordered_keys:
+            for v in vals:
+                query_parts.append(f"{k}={quote_plus(v)}")
+
+    new_query = "&".join(query_parts)
+    updated_link = f"{prefix}/#{fp_part}&{new_query}"
+    return updated_link, True
 
 
 def get_color_from_fingerprint(hex_fp: str) -> Tuple[int, int, int]:

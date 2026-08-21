@@ -154,6 +154,23 @@ def claim_username(username: str, invite_link: str, chat_id: str) -> Dict[str, A
     }
 
 
+def update_username_invite_metadata(username: str, new_invite_link: str) -> bool:
+    """Update invite link for an existing claimed username and refresh timestamp."""
+    clean_username = username.strip().lower()
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _lock:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE usernames SET invite_link = ?, updated_at = ? WHERE username = ?",
+            (new_invite_link, now_iso, clean_username),
+        )
+        changed = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return changed
+
+
 def unlink_username(username: str) -> bool:
     clean_username = username.strip().lower()
     with _lock:

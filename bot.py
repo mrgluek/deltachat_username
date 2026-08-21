@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.6.2"
+VERSION = "1.7.0"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -1380,6 +1380,26 @@ def on_new_message(bot, accid, event):
         addr = bot.rpc.get_config(accid, "configured_addr") or bot.rpc.get_config(accid, "addr")
         if addr:
             database.increment_transport_received(addr)
+    except Exception:
+        pass
+
+    # Automatically sync sender's active email relay & display name if they own a username
+    try:
+        chat_id = str(msg.chat_id)
+        claim = database.get_username_by_chat(chat_id)
+        if claim and claim.get("invite_link") and msg.from_id:
+            contact = bot.rpc.get_contact(accid, msg.from_id)
+            if contact:
+                user_email = getattr(contact, "addr", "")
+                user_name = getattr(contact, "display_name", "") or getattr(contact, "name", "")
+                updated_link, changed = identicon.update_invite_link_contact_info(
+                    claim["invite_link"],
+                    new_email=user_email,
+                    new_display_name=user_name,
+                )
+                if changed:
+                    database.update_username_invite_metadata(claim["username"], updated_link)
+                    identicon.clear_png_cache()
     except Exception:
         pass
 

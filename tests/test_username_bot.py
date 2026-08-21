@@ -13,6 +13,7 @@ os.environ["DB_PATH"] = tmp_db.name
 os.environ["INVITE_BASE_URL"] = "https://i.gluek.info/#"
 
 import database
+import identicon
 from bot import (
     validate_username_format,
     validate_invite_link,
@@ -247,6 +248,22 @@ class TestUsernameBot(unittest.TestCase):
         self.assertIn("gluek@chatmail.uk", res.text)
         self.assertIn("DFF2 CAB1 FEB7 182F 997C", res.text)
         self.assertIn("Start Chat in Delta Chat", res.text)
+
+    def test_update_username_invite_metadata_and_sync(self):
+        link = "https://i.deltachat.id/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=old%40chatmail.uk&n=Old"
+        database.claim_username("synctest", link, "chat_sync")
+
+        updated_link, changed = identicon.update_invite_link_contact_info(
+            link, new_email="new@chatmail.uk", new_display_name="New Name"
+        )
+        self.assertTrue(changed)
+        res = database.update_username_invite_metadata("synctest", updated_link)
+        self.assertTrue(res)
+
+        claim = database.get_username_claim("synctest")
+        meta = identicon.parse_invite_metadata(claim["invite_link"])
+        self.assertEqual(meta["email"], "new@chatmail.uk")
+        self.assertEqual(meta["display_name"], "New Name")
 
 
 if __name__ == "__main__":

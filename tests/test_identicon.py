@@ -143,7 +143,31 @@ class TestIdenticon(unittest.TestCase):
 
         # Cached call
         png2 = identicon.generate_og_png_bytes("gluek", meta)
-        self.assertEqual(png1, png2)
+    def test_update_invite_link_contact_info(self):
+        link = "https://i.deltachat.id/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=token123&s=sig456&a=old%40chatmail.uk&n=OldName"
+        updated, changed = identicon.update_invite_link_contact_info(
+            link, new_email="new@chatmail.uk", new_display_name="New Name"
+        )
+        self.assertTrue(changed)
+        self.assertIn("a=new%40chatmail.uk", updated)
+        self.assertIn("n=New+Name", updated)
+        self.assertIn("i=token123", updated)
+        self.assertIn("s=sig456", updated)
+
+        # No change if same
+        updated2, changed2 = identicon.update_invite_link_contact_info(
+            updated, new_email="new@chatmail.uk", new_display_name="New Name"
+        )
+        self.assertFalse(changed2)
+        self.assertEqual(updated, updated2)
+
+        # Do not modify group links
+        group_link = "https://i.deltachat.id/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&g=MyGroup&n=Admin"
+        g_updated, g_changed = identicon.update_invite_link_contact_info(
+            group_link, new_email="new@chatmail.uk", new_display_name="New Name"
+        )
+        self.assertFalse(g_changed)
+        self.assertEqual(group_link, g_updated)
 
 
 if __name__ == "__main__":

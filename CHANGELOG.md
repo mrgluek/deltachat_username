@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2026-08-22
+
+### Added
+- **Automatic User Relay & Contact Details Synchronization**:
+  - Whenever a registered user sends a message to the bot, the bot automatically checks their live contact info (`contact.addr` and `contact.display_name`) from Delta Chat core.
+  - If the user changed their email relay / mail provider or updated their profile display name, the bot automatically updates their registered username invite link in the database and refreshes the cached OpenGraph verification cards (`update_invite_link_contact_info` & `update_username_invite_metadata`).
+  - Personal invite link tokens and cryptographic signatures remain intact while keeping email address and display name 100% up to date.
+
+---
+
 ## [1.6.2] - 2026-08-22
 
 ### Fixed & Improved
