@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.1] - 2026-08-22
+
+### Fixed
+- **Admin Channel & Personal Profile Multi-Claim Isolation**:
+  - Linking channel or broadcast invite links (`&b=`) in private chat now automatically stores claims under the `admin_<username>` namespace, preserving the admin's personal chat profile claim.
+  - Automatically migrates existing channel claims out of the personal chat namespace when re-linking personal usernames (`/link gluek ...`), ensuring both `@stickers` and `@gluek` remain concurrently valid.
+
+---
+
 ## [1.8.0] - 2026-08-22
 
 ### Added & Improved

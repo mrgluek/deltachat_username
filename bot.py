@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.8.0"
+VERSION = "1.8.1"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -1321,17 +1321,30 @@ def link_command(bot, accid, event):
         )
         return
 
+    meta = identicon.parse_invite_metadata(invite_url)
+    is_channel_or_group = meta.get("target_type") in ("channel", "group")
     prev_claim = database.get_username_by_chat(msg.chat_id)
 
-    # For Admin: if adding a secondary/different username in private chat,
-    # do NOT overwrite/unlink the admin's personal chat username!
+    # For Admin: allow registering multiple custom usernames (channels, groups, aliases)
+    # without destroying personal profile claims or channel claims
     if is_admin:
-        if prev_claim and prev_claim["username"] != target_username:
-            claim_owner = f"admin_linked_{target_username}"
+        if is_channel_or_group:
+            claim_owner = f"admin_{target_username}"
+            old_username = None
+        elif prev_claim and prev_claim["username"] != target_username:
+            # If the current chat's claim was a channel/group, preserve it under admin_ namespace
+            prev_meta = identicon.parse_invite_metadata(prev_claim["invite_link"])
+            if prev_meta.get("target_type") in ("channel", "group"):
+                database.claim_username(
+                    prev_claim["username"],
+                    prev_claim["invite_link"],
+                    f"admin_{prev_claim['username']}",
+                )
+            claim_owner = msg.chat_id
             old_username = None
         else:
             claim_owner = msg.chat_id
-            old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
+            old_username = None
     else:
         claim_owner = msg.chat_id
         old_username = prev_claim["username"] if (prev_claim and prev_claim["username"] != target_username) else None
