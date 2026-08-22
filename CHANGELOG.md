@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] - 2026-08-22
+
+### Added & Improved
+- **Visual WebP Card Image Attachments in `/username`**:
+  - Replaced monospace ASCII Unicode identicon text block in bot chat with an attached ~20KB WebP visual card image.
+  - Accompanies the card with a clean, direct `https://i.delta.chat/#...` invite link as message caption, enabling one-tap native in-app chat start without external browser redirection.
+  - Added `generate_og_webp_bytes` and `get_or_create_card_webp_path` in `identicon.py` with automatic fallback to text card if image rendering is unavailable.
+
+---
+
 ## [1.7.0] - 2026-08-22
 
 ### Added

@@ -23,7 +23,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -1114,6 +1114,32 @@ def initadmin_command(bot, accid, event):
         )
 
 
+def _send_username_card_reply(
+    bot, accid: int, chat_id: int, username: str, invite_link: str, updated_at: str, base_url: str
+):
+    """Send visual WebP card image attachment accompanied by direct i.delta.chat invite link."""
+    metadata = identicon.parse_invite_metadata(invite_link, updated_at)
+    raw_link = metadata.get("canonical_link") or invite_link
+    if "/#" in raw_link:
+        canonical_link = "https://i.delta.chat/#" + raw_link[raw_link.find("/#") + 2 :]
+    else:
+        canonical_link = raw_link
+
+    caption = canonical_link
+    card_file = identicon.get_or_create_card_webp_path(username, metadata, base_url=base_url)
+
+    if card_file and os.path.exists(card_file):
+        _dc_send_msg_with_stats(
+            bot,
+            accid,
+            chat_id,
+            MsgData(text=caption, file=card_file),
+        )
+    else:
+        card_text = format_username_card_text(username, invite_link, updated_at, base_url)
+        _dc_send_msg_with_stats(bot, accid, chat_id, MsgData(text=card_text))
+
+
 @dc_cli.on(events.NewMessage(command="/username"))
 def username_command(bot, accid, event):
     msg = event.msg
@@ -1127,13 +1153,15 @@ def username_command(bot, accid, event):
         current_claim = database.get_username_by_chat(msg.chat_id)
         if current_claim:
             uname = current_claim["username"]
-            card_text = format_username_card_text(
+            _send_username_card_reply(
+                bot,
+                accid,
+                msg.chat_id,
                 uname,
                 current_claim["invite_link"],
                 current_claim.get("updated_at", ""),
                 base_url,
             )
-            _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=card_text))
         else:
             if is_group:
                 _dc_send_msg_with_stats(
@@ -1159,13 +1187,15 @@ def username_command(bot, accid, event):
     target_username = raw_payload.lower()
     claim = database.get_username_claim(target_username)
     if claim:
-        card_text = format_username_card_text(
+        _send_username_card_reply(
+            bot,
+            accid,
+            msg.chat_id,
             target_username,
             claim["invite_link"],
             claim.get("updated_at", ""),
             base_url,
         )
-        _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=card_text))
     else:
         _dc_send_msg_with_stats(
             bot,

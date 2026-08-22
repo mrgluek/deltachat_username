@@ -141,8 +141,23 @@ class TestIdenticon(unittest.TestCase):
         # PNG signature check: \x89PNG\r\n\x1a\n
         self.assertTrue(png1.startswith(b"\x89PNG\r\n\x1a\n"))
 
-        # Cached call
         png2 = identicon.generate_og_png_bytes("gluek", meta)
+        self.assertEqual(png1, png2)
+
+    def test_generate_og_webp_and_path(self):
+        url = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=t&s=s&a=test%40example.com&n=Gluek"
+        meta = identicon.parse_invite_metadata(url, "2026-08-19T10:00:00Z")
+
+        webp_bytes = identicon.generate_og_webp_bytes("gluek", meta)
+        self.assertTrue(len(webp_bytes) > 0)
+        self.assertTrue(webp_bytes.startswith(b"RIFF") and b"WEBP" in webp_bytes[:16])
+
+        path = identicon.get_or_create_card_webp_path("gluek", meta)
+        self.assertIsNotNone(path)
+        self.assertTrue(os.path.exists(path))
+        self.assertTrue(os.path.getsize(path) > 0)
+
+
     def test_update_invite_link_contact_info(self):
         link = "https://i.deltachat.id/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=token123&s=sig456&a=old%40chatmail.uk&n=OldName"
         updated, changed = identicon.update_invite_link_contact_info(

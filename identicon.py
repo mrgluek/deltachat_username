@@ -12,6 +12,7 @@ import hashlib
 import io
 import os
 import re
+import tempfile
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional
 from urllib.parse import parse_qs, unquote, quote_plus
@@ -605,6 +606,44 @@ def generate_og_png_bytes(username: str, metadata: Dict[str, Any], base_url: str
     _PNG_CACHE[cache_key] = png_bytes
 
     return png_bytes
+
+
+def generate_og_webp_bytes(
+    username: str, metadata: Dict[str, Any], base_url: str = "https://deltachat.id"
+) -> bytes:
+    """Generate lightweight (~20KB) WebP card for instant Delta Chat messenger transmission."""
+    png_bytes = generate_og_png_bytes(username, metadata, base_url=base_url)
+    if not png_bytes:
+        return b""
+    try:
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(png_bytes))
+        out = io.BytesIO()
+        img.save(out, format="WEBP", quality=85, method=6)
+        return out.getvalue()
+    except Exception:
+        return png_bytes
+
+
+def get_or_create_card_webp_path(
+    username: str, metadata: Dict[str, Any], base_url: str = "https://deltachat.id"
+) -> Optional[str]:
+    """Generate and write cached WebP card image file to temp directory for Delta Chat file attachments."""
+    try:
+        clean_username = username.strip().lower()
+        webp_bytes = generate_og_webp_bytes(clean_username, metadata, base_url=base_url)
+        if not webp_bytes:
+            return None
+
+        cards_dir = os.path.join(tempfile.gettempdir(), "deltachat_cards")
+        os.makedirs(cards_dir, exist_ok=True)
+        file_path = os.path.join(cards_dir, f"{clean_username}.webp")
+        with open(file_path, "wb") as f:
+            f.write(webp_bytes)
+        return file_path
+    except Exception:
+        return None
 
 
 def clear_png_cache():
