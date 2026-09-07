@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import base64
 import io
+import json
 import os
 import re
 import sys
@@ -23,7 +24,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.8.1"
+VERSION = "1.8.2"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -193,16 +194,31 @@ def rewrite_invite_link(url: str) -> str:
 def configure_bot_profile(bot, accid: int):
     """Configure bot display name, status text, and avatar icon from environment or default files."""
     try:
-        bot_name = os.environ.get("DISPLAY_NAME", "Username Bot")
+        bot_name = os.environ.get("DISPLAY_NAME")
+        if not bot_name and os.path.exists("/data/options.json"):
+            try:
+                with open("/data/options.json", "r", encoding="utf-8") as f:
+                    opts = json.load(f)
+                    bot_name = opts.get("display_name", "").strip()
+            except Exception:
+                pass
+        if not bot_name:
+            bot_name = "Username Bot"
         bot.rpc.set_config(accid, "displayname", bot_name)
     except Exception as e:
         bot.logger.warning(f"Failed to set displayname: {e}")
 
     try:
-        status_text = os.environ.get(
-            "STATUS_TEXT",
-            "Short custom invite link service for Delta Chat: https://d.gluek.info",
-        )
+        status_text = os.environ.get("STATUS_TEXT")
+        if not status_text and os.path.exists("/data/options.json"):
+            try:
+                with open("/data/options.json", "r", encoding="utf-8") as f:
+                    opts = json.load(f)
+                    status_text = opts.get("status_text", "").strip()
+            except Exception:
+                pass
+        if not status_text:
+            status_text = "Short custom invite link service for Delta Chat: https://d.gluek.info"
         bot.rpc.set_config(accid, "selfstatus", status_text)
     except Exception as e:
         bot.logger.warning(f"Failed to set selfstatus: {e}")

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.2] - 2026-09-07
+
+### Added
+- **Options.json Fallback for Display Name & Status Text**:
+  - `configure_bot_profile` now checks `/data/options.json` fallback when `DISPLAY_NAME` or `STATUS_TEXT` are not set in environment variables.
+
+---
+
 ## [1.8.1] - 2026-08-22
 
 ### Fixed
