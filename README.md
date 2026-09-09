@@ -75,8 +75,12 @@ Send `/initadmin` to the bot in a private message in Delta Chat to complete admi
 | `/initadmin` | Admin | Claim administrative ownership. |
 | `/url <url>` | Admin | Set base domain URL (`https://deltachat.id`). |
 | `/inviteurl <url>` | Admin | Set custom invite base URL/mirror (`https://i.gluek.info/#`). |
-| `/stats` | Admin | Show registered usernames and database stats. |
+| `/stats` | Admin | Show registered usernames, resilient mode, and database stats. |
 | `/transports` | Admin | List configured mail relays and statistics. |
+| `/addtransport <uri/creds>` | Admin (Private) | Add a backup mail transport relay. |
+| `/rmtransport <addr>` | Admin | Remove a configured mail transport. |
+| `/setprimary <addr>` | Admin | Switch primary mail sending transport. |
+| `/resilient [on\|off]` | Admin | Toggle resilient multi-relay broadcasting mode. |
 
 ---
 
