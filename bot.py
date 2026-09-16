@@ -24,7 +24,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "1.8.3"
+VERSION = "1.8.4"
 
 app = FastAPI(title="Delta Chat Username Service")
 dc_cli = BotCli("usernamebot")
@@ -531,7 +531,15 @@ def get_favicon():
 
 
 @app.get("/", response_class=HTMLResponse)
-def get_index_page():
+def get_index_page(request: Request):
+    client_ip = get_client_ip(request)
+    if is_rate_limited(client_ip):
+        return HTMLResponse(
+            content="""<!DOCTYPE html><html><head><title>429 Too Many Requests</title></head><body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;text-align:center;padding:50px;"><h1>429 - Too Many Requests</h1><p>Please wait a minute before trying again.</p></body></html>""",
+            status_code=429,
+            headers={"Retry-After": "60"}
+        )
+
     base_url = database.get_config("base_url") or BASE_URL
     bot_invite = database.get_config("bot_invite_url") or ""
     bot_addr = database.get_config("bot_addr") or ""
@@ -930,6 +938,14 @@ def get_username_avatar_svg(username: str, request: Request):
 
 @app.get("/{username}/card", response_class=HTMLResponse)
 def get_username_card_page(username: str, request: Request):
+    client_ip = get_client_ip(request)
+    if is_rate_limited(client_ip):
+        return HTMLResponse(
+            content="""<!DOCTYPE html><html><head><title>429 Too Many Requests</title></head><body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;text-align:center;padding:50px;"><h1>429 - Too Many Requests</h1><p>Please wait a minute before trying again.</p></body></html>""",
+            status_code=429,
+            headers={"Retry-After": "60"}
+        )
+
     clean_username = username.strip().lower()
     claim = database.get_username_claim(clean_username)
     if not claim or not claim.get("invite_link"):
