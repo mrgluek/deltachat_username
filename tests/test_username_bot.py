@@ -267,7 +267,7 @@ class TestUsernameBot(unittest.TestCase):
 
     def test_username_command_sends_webp_card(self):
         from unittest.mock import MagicMock, patch
-        import bot
+        import commands
 
         link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
         database.claim_username("botuser", link, "chat_200")
@@ -278,8 +278,8 @@ class TestUsernameBot(unittest.TestCase):
         mock_event.msg.from_id = 200
         mock_event.payload = "botuser"
 
-        with patch.object(bot, "_dc_send_msg_with_stats") as mock_send:
-            bot.username_command(mock_bot, 1, mock_event)
+        with patch.object(commands, "_dc_send_msg_with_stats") as mock_send:
+            commands.username_command(mock_bot, 1, mock_event)
             self.assertTrue(mock_send.called)
             args, kwargs = mock_send.call_args
             msg_data = args[3]

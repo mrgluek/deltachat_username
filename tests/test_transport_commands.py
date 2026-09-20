@@ -36,7 +36,7 @@ except ImportError:
     sys.modules['deltabot_cli'] = mock_deltabot_cli
 
 import database
-import bot
+import commands
 
 TEST_DB_PATH = "test_username_transport_cmds.db"
 
@@ -76,116 +76,116 @@ class TestTransportCommands(unittest.TestCase):
 
     # ── /initadmin ─────────────────────────────────────────────────────────
 
-    @patch("bot._is_private_chat")
+    @patch("commands._is_private_chat")
     def test_initadmin_rejected_in_group_chat(self, mock_is_private):
         mock_is_private.return_value = False
-        bot.initadmin_command(self.mock_bot, self.accid, self.mock_event)
+        commands.initadmin_command(self.mock_bot, self.accid, self.mock_event)
         self.mock_bot.rpc.send_msg.assert_called_once()
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("only be used in a private 1:1 chat", msg_text)
 
-    @patch("bot._get_contact_fingerprint")
-    @patch("bot._is_private_chat")
+    @patch("commands._get_contact_fingerprint")
+    @patch("commands._is_private_chat")
     def test_initadmin_success(self, mock_is_private, mock_get_fp):
         mock_is_private.return_value = True
         mock_get_fp.return_value = "AABBCCDDAABBCCDDAABBCCDDAABBCCDD"
-        bot.initadmin_command(self.mock_bot, self.accid, self.mock_event)
+        commands.initadmin_command(self.mock_bot, self.accid, self.mock_event)
         self.assertEqual(database.get_admin_email(), "admin@example.com")
         self.assertEqual(database.get_admin_fingerprint(), "AABBCCDDAABBCCDDAABBCCDDAABBCCDD")
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("You are now confirmed as admin", msg_text)
 
-    @patch("bot._is_private_chat")
+    @patch("commands._is_private_chat")
     def test_initadmin_already_set(self, mock_is_private):
         mock_is_private.return_value = True
         database.set_admin_email("admin@example.com")
         database.set_admin_fingerprint("AABBCCDDAABBCCDDAABBCCDDAABBCCDD")
-        bot.initadmin_command(self.mock_bot, self.accid, self.mock_event)
+        commands.initadmin_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Admin is already set", msg_text)
 
     # ── /addtransport ───────────────────────────────────────────────────────
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_addtransport_non_admin_rejected(self, mock_admin):
         mock_admin.return_value = False
-        bot.addtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.addtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("only for the administrator", msg_text)
 
-    @patch("bot._is_dc_admin")
-    @patch("bot._is_private_chat")
+    @patch("commands._is_dc_admin")
+    @patch("commands._is_private_chat")
     def test_addtransport_rejected_in_group(self, mock_is_private, mock_admin):
         mock_admin.return_value = True
         mock_is_private.return_value = False
-        bot.addtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.addtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("only be used in a private 1:1 chat", msg_text)
 
-    @patch("bot._is_dc_admin")
-    @patch("bot._is_private_chat")
+    @patch("commands._is_dc_admin")
+    @patch("commands._is_private_chat")
     def test_addtransport_empty_payload(self, mock_is_private, mock_admin):
         mock_admin.return_value = True
         mock_is_private.return_value = True
         self.mock_event.payload = ""
-        bot.addtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.addtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Usage:", msg_text)
 
-    @patch("bot._is_dc_admin")
-    @patch("bot._is_private_chat")
+    @patch("commands._is_dc_admin")
+    @patch("commands._is_private_chat")
     def test_addtransport_success_qr(self, mock_is_private, mock_admin):
         mock_admin.return_value = True
         mock_is_private.return_value = True
         self.mock_event.payload = "DCACCOUNT:chatmail.example.org"
-        bot.addtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.addtransport_command(self.mock_bot, self.accid, self.mock_event)
         self.mock_bot.rpc.add_transport_from_qr.assert_called_once_with(self.accid, "DCACCOUNT:chatmail.example.org")
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Backup transport added via chatmail URI", msg_text)
 
-    @patch("bot._is_dc_admin")
-    @patch("bot._is_private_chat")
+    @patch("commands._is_dc_admin")
+    @patch("commands._is_private_chat")
     def test_addtransport_success_credentials(self, mock_is_private, mock_admin):
         mock_admin.return_value = True
         mock_is_private.return_value = True
         self.mock_event.payload = "user@example.com secretpassword"
-        bot.addtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.addtransport_command(self.mock_bot, self.accid, self.mock_event)
         self.mock_bot.rpc.add_or_update_transport.assert_called_once_with(
             self.accid, {"addr": "user@example.com", "password": "secretpassword"}
         )
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Backup transport `user@example.com` added", msg_text)
 
-    @patch("bot._is_dc_admin")
-    @patch("bot._is_private_chat")
+    @patch("commands._is_dc_admin")
+    @patch("commands._is_private_chat")
     def test_addtransport_sanitized_error(self, mock_is_private, mock_admin):
         mock_admin.return_value = True
         mock_is_private.return_value = True
         self.mock_event.payload = "DCACCOUNT:bad"
         self.mock_bot.rpc.add_transport_from_qr.side_effect = RuntimeError("Internal secret connection failure")
-        bot.addtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.addtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertEqual(msg_text, "❌ Failed to add transport.")
 
     # ── /rmtransport ───────────────────────────────────────────────────────
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_rmtransport_non_admin_rejected(self, mock_admin):
         mock_admin.return_value = False
-        bot.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("only for the administrator", msg_text)
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_rmtransport_cannot_remove_last(self, mock_admin):
         mock_admin.return_value = True
         self.mock_event.payload = "relay@example.com"
         self.mock_bot.rpc.list_transports.return_value = [{"addr": "relay@example.com"}]
-        bot.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Cannot remove the last transport", msg_text)
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_rmtransport_not_found(self, mock_admin):
         mock_admin.return_value = True
         self.mock_event.payload = "nonexistent@example.com"
@@ -193,11 +193,11 @@ class TestTransportCommands(unittest.TestCase):
             {"addr": "relay1@example.com"},
             {"addr": "relay2@example.com"},
         ]
-        bot.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("not found", msg_text)
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_rmtransport_success(self, mock_admin):
         mock_admin.return_value = True
         self.mock_event.payload = "relay2@example.com"
@@ -205,97 +205,97 @@ class TestTransportCommands(unittest.TestCase):
             {"addr": "relay1@example.com"},
             {"addr": "relay2@example.com"},
         ]
-        bot.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
         self.mock_bot.rpc.delete_transport.assert_called_once_with(self.accid, "relay2@example.com")
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("removed", msg_text)
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_rmtransport_sanitized_error(self, mock_admin):
         mock_admin.return_value = True
         self.mock_event.payload = "relay2@example.com"
         self.mock_bot.rpc.list_transports.side_effect = RuntimeError("DB locked")
-        bot.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
+        commands.rmtransport_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertEqual(msg_text, "❌ Failed to remove transport.")
 
     # ── /setprimary ────────────────────────────────────────────────────────
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_setprimary_success(self, mock_admin):
         mock_admin.return_value = True
         self.mock_event.payload = "primary@example.com"
         self.mock_bot.rpc.list_transports.return_value = [{"addr": "primary@example.com"}]
-        bot.setprimary_command(self.mock_bot, self.accid, self.mock_event)
+        commands.setprimary_command(self.mock_bot, self.accid, self.mock_event)
         self.mock_bot.rpc.set_config.assert_called_once_with(self.accid, "configured_addr", "primary@example.com")
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Primary SMTP transport switched", msg_text)
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_setprimary_sanitized_error(self, mock_admin):
         mock_admin.return_value = True
         self.mock_event.payload = "primary@example.com"
         self.mock_bot.rpc.list_transports.return_value = [{"addr": "primary@example.com"}]
         self.mock_bot.rpc.set_config.side_effect = RuntimeError("Config write failed")
-        bot.setprimary_command(self.mock_bot, self.accid, self.mock_event)
+        commands.setprimary_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertEqual(msg_text, "❌ Failed to set primary transport.")
 
     # ── /resilient ─────────────────────────────────────────────────────────
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_resilient_toggle(self, mock_admin):
         mock_admin.return_value = True
 
         # Toggle to ON
         self.mock_event.payload = ""
-        bot.resilient_command(self.mock_bot, self.accid, self.mock_event)
+        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
         self.assertEqual(database.get_config("resilient"), "1")
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("ENABLED", msg_text)
 
         # Toggle to OFF
         self.mock_event.payload = ""
-        bot.resilient_command(self.mock_bot, self.accid, self.mock_event)
+        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
         self.assertEqual(database.get_config("resilient"), "0")
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("DISABLED", msg_text)
 
         # Set explicitly ON
         self.mock_event.payload = "on"
-        bot.resilient_command(self.mock_bot, self.accid, self.mock_event)
+        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
         self.assertEqual(database.get_config("resilient"), "1")
 
         # Set explicitly OFF
         self.mock_event.payload = "off"
-        bot.resilient_command(self.mock_bot, self.accid, self.mock_event)
+        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
         self.assertEqual(database.get_config("resilient"), "0")
 
     # ── /transports ────────────────────────────────────────────────────────
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_transports_list_success(self, mock_admin):
         mock_admin.return_value = True
         self.mock_bot.rpc.list_transports.return_value = [{"addr": "relay1@example.com"}]
-        bot.transports_command(self.mock_bot, self.accid, self.mock_event)
+        commands.transports_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Configured Transports", msg_text)
         self.assertIn("relay1@example.com", msg_text)
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_transports_sanitized_error(self, mock_admin):
         mock_admin.return_value = True
         self.mock_bot.rpc.list_transports.side_effect = RuntimeError("Internal RPC error")
-        bot.transports_command(self.mock_bot, self.accid, self.mock_event)
+        commands.transports_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertEqual(msg_text, "❌ Failed to list transports.")
 
     # ── /stats ─────────────────────────────────────────────────────────────
 
-    @patch("bot._is_dc_admin")
+    @patch("commands._is_dc_admin")
     def test_stats_command(self, mock_admin):
         mock_admin.return_value = True
-        bot.stats_command(self.mock_bot, self.accid, self.mock_event)
+        commands.stats_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Bot Statistics", msg_text)
         self.assertIn("Total Registered Usernames", msg_text)
