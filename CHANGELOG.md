@@ -5,6 +5,18 @@ All notable changes to the **Delta Chat Username Bot (`deltachat_username`)** wi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.5] - 2026-09-20
+
+### Refactor
+- **Modularized `bot.py`**: Split the 2100+ line monolith into `security.py` (rate limiting, crawler detection), `formatting.py` (invite-link/URL helpers, QR generation), `dc_helpers.py` (Delta Chat RPC helpers: profile config, group-chat detection, admin/fingerprint checks), `web/routes.py` (FastAPI app and all HTTP endpoints), and `commands.py` (all bot command/event handlers). `bot.py` is now just the assembly/entrypoint file (`run_fastapi`, `on_init`, `on_start`, `__main__`) and keeps re-exporting the same names, so the Docker entrypoint (`python bot.py serve`) and existing imports are unaffected. Pure move, no behavior change; verified with the full test suite after every extracted module.
+
+### Security
+- **Fixed spoofable rate-limit bypass**: `get_client_ip` now trusts the *last* entry of `X-Forwarded-For` (the one our reverse proxy appends) instead of the first (client-supplied) one, closing a bypass where any client could fake its own IP via the header to dodge the per-IP rate limiter.
+- **Bounded rate-limit memory**: Added `prune_rate_limits()`, run periodically alongside the existing background cleanup worker, so `_ip_request_history` no longer grows unbounded for IPs that stop returning.
+- Removed unused `is_crawler_request`/`CRAWLER_USER_AGENTS`/`TELEGRAM_IP_PREFIXES` dead code left over from a previous implementation.
+
+---
+
 ## [1.8.4] - 2026-09-16
 
 ### Security
