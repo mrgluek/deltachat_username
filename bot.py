@@ -12,12 +12,10 @@ from web.routes import app
 from security import (
     RATE_LIMIT_REQUESTS,
     RATE_LIMIT_WINDOW,
-    CRAWLER_USER_AGENTS,
-    TELEGRAM_IP_PREFIXES,
     get_client_ip,
     is_rate_limited,
     clear_rate_limits,
-    is_crawler_request,
+    prune_rate_limits,
 )
 from formatting import (
     BASE_URL,
@@ -104,6 +102,7 @@ def on_start(bot, _args):
                 time.sleep(60)
                 database.flush_transport_stats()
                 database.cleanup_old_records()
+                prune_rate_limits()
             except Exception as e:
                 bot.logger.error(f"Error in background cleanup worker: {e}")
 

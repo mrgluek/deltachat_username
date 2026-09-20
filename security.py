@@ -13,10 +13,19 @@ _rate_limit_lock = threading.Lock()
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract client IP address, respecting reverse proxy headers."""
+    """Extract client IP address, trusting only the hop our own reverse proxy appended.
+
+    We deploy behind a single reverse proxy (Caddy) bound to 127.0.0.1, so uvicorn only
+    ever sees connections from it. Caddy appends the real peer address as the last entry
+    of X-Forwarded-For rather than overwriting it, so the first entry is whatever the
+    client itself sent and can be spoofed to defeat the rate limiter below - the last
+    entry is the one hop we can actually trust.
+    """
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+        parts = [p.strip() for p in forwarded_for.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
         return real_ip.strip()
@@ -48,29 +57,15 @@ def clear_rate_limits():
         _ip_request_history.clear()
 
 
-# --- CRAWLER DETECTION FOR OPENGRAPH PREVIEWS ---
-CRAWLER_USER_AGENTS = [
-    "telegrambot", "twitterbot", "facebookexternalhit", "discordbot",
-    "slackbot", "whatsapp", "vkshare", "w3c_validator", "redditbot",
-    "applebot", "bingbot", "googlebot", "yandex", "linkedinbot",
-    "mastodon", "matrix", "embedly", "quora link preview", "outbrain",
-    "pinterest", "skypeuripreview", "webpreview", "deltachat",
-    "preview", "bot", "crawler", "spider", "scraper", "fetch",
-    "curl", "wget", "http-client", "python", "requests", "httpx",
-    "aiohttp", "urllib", "axios", "got", "node", "ruby",
-    "go-http-client", "java", "okhttp", "libwww", "feed",
-]
-TELEGRAM_IP_PREFIXES = ("149.154.", "91.108.", "95.161.")
+def prune_rate_limits():
+    """Drop IP entries that have aged out of the rate-limit window entirely.
 
-
-def is_crawler_request(request: Request) -> bool:
-    """Detect if request comes from a social media crawler, preview bot, or scraper."""
-    ua = request.headers.get("user-agent", "").lower()
-    if not ua:
-        return True
-    if any(crawler in ua for crawler in CRAWLER_USER_AGENTS):
-        return True
-    client_ip = get_client_ip(request)
-    if any(client_ip.startswith(prefix) for prefix in TELEGRAM_IP_PREFIXES):
-        return True
-    return False
+    is_rate_limited() only trims an IP's own timestamp list when that IP makes a new
+    request, so an IP that stops coming back stays in _ip_request_history forever.
+    Call this periodically from a background worker to bound memory over long uptime.
+    """
+    cutoff = time.time() - RATE_LIMIT_WINDOW
+    with _rate_limit_lock:
+        stale_ips = [ip for ip, timestamps in _ip_request_history.items() if not timestamps or max(timestamps) <= cutoff]
+        for ip in stale_ips:
+            del _ip_request_history[ip]
