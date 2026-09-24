@@ -5,6 +5,14 @@ All notable changes to the **Delta Chat Username Bot (`deltachat_username`)** wi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-09-24
+
+### Added
+- **Target-Specific Commands in Group Chats**: Commands can be addressed to this bot with a suffix (`/help@username`, `/stats@user`, …); commands addressed to another bot (`/help@yt`) are ignored. Un-suffixed `/stats` is ignored in groups with several bots.
+
+### Changed
+- **Private `/help` in Groups**: A plain `/help` sent in a group chat is now answered in a private 1:1 chat with the sender instead of the group, so several bots don't flood it with help texts (the reply ends with a note on how to show it in the group). Addressed `/help@username` is still answered in the group.
+
 ## [1.8.6] - 2026-09-24
 
 ### Fixed

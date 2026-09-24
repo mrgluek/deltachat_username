@@ -84,6 +84,14 @@ Send `/initadmin` to the bot in a private message in Delta Chat to complete admi
 
 ---
 
+### Target-Specific Commands in Group Chats
+
+In group chats where multiple bots are present, you can address this bot specifically to prevent other bots from responding. Append the `@username` (or `@user`, `@usernamebot`) suffix to any command, for example:
+- `/help@username`
+- `/stats@username`
+
+A plain `/help` sent in a group chat is answered in a private 1:1 chat with the sender, so several bots don't flood the group with help texts. Use `/help@username` to show the help in the group itself.
+
 ## 🌐 Caddy Configuration
 
 Add to your `/etc/caddy/Caddyfile`:

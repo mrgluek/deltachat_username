@@ -30,6 +30,7 @@ from formatting import (
 )
 from dc_helpers import (
     configure_bot_profile,
+    setup_custom_command_parser,
     is_group_chat,
     _is_private_chat,
     _is_dc_admin,
@@ -93,6 +94,7 @@ def on_init(bot, _args):
 
 @dc_cli.on_start
 def on_start(bot, _args):
+    setup_custom_command_parser(bot, ["user", "usernamebot"])
     bot.logger.info(f"🚀 Delta Chat Username Bot v{VERSION} is now fully running. Waiting for events...")
     _setup_resilient_mode(bot)
 

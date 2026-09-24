@@ -23,7 +23,7 @@ from formatting import (
     validate_invite_link,
 )
 
-VERSION = "1.8.6"
+VERSION = "1.9.0"
 
 dc_cli = BotCli("usernamebot")
 
@@ -72,11 +72,26 @@ def get_help_text(bot, accid: int, from_id: int) -> str:
     return help_text
 
 
+HELP_PRIVATE_NOTE = "\n\n💬 Sent privately because you asked in a group. Use /help@username there to show it to everyone."
+
+
+def _get_help_chat_id(bot, accid, msg):
+    """Plain /help in a group is answered privately to the sender so several bots
+    don't flood the group; /help@<bot> is still answered in the group itself."""
+    cmd = msg.text.split(maxsplit=1)[0] if msg.text else ""
+    if "@" in cmd or _is_private_chat(bot, accid, msg.chat_id):
+        return msg.chat_id
+    return bot.rpc.create_chat_by_contact_id(accid, msg.from_id)
+
+
 @dc_cli.on(events.NewMessage(command="/help"))
 def help_command(bot, accid, event):
     msg = event.msg
     help_text = get_help_text(bot, accid, msg.from_id)
-    _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=help_text))
+    chat_id = _get_help_chat_id(bot, accid, msg)
+    if chat_id != msg.chat_id:
+        help_text += HELP_PRIVATE_NOTE
+    _dc_send_msg_with_stats(bot, accid, chat_id, MsgData(text=help_text))
 
 
 @dc_cli.on(events.NewMessage(command="/donate"))
