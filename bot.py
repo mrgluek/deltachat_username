@@ -56,8 +56,6 @@ from commands import (
     on_new_message,
     url_command,
     inviteurl_command,
-    _setup_resilient_mode,
-    on_msg_failed,
     stats_command,
     transports_command,
     addtransport_command,
@@ -96,7 +94,6 @@ def on_init(bot, _args):
 def on_start(bot, _args):
     setup_custom_command_parser(bot, ["user", "usernamebot"])
     bot.logger.info(f"🚀 Delta Chat Username Bot v{VERSION} is now fully running. Waiting for events...")
-    _setup_resilient_mode(bot)
 
     def _bg_cleanup_worker():
         while True:

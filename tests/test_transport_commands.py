@@ -220,68 +220,32 @@ class TestTransportCommands(unittest.TestCase):
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertEqual(msg_text, "❌ Failed to remove transport.")
 
-    # ── /setprimary ────────────────────────────────────────────────────────
+    # ── deprecated /setprimary and /resilient ──────────────────────────────
 
     @patch("commands._is_dc_admin")
-    def test_setprimary_success(self, mock_admin):
+    def test_deprecated_relay_commands(self, mock_admin):
         mock_admin.return_value = True
-        self.mock_event.payload = "primary@example.com"
-        self.mock_bot.rpc.list_transports.return_value = [{"addr": "primary@example.com"}]
-        commands.setprimary_command(self.mock_bot, self.accid, self.mock_event)
-        self.mock_bot.rpc.set_config.assert_called_once_with(self.accid, "configured_addr", "primary@example.com")
-        msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
-        self.assertIn("Primary SMTP transport switched", msg_text)
-
-    @patch("commands._is_dc_admin")
-    def test_setprimary_sanitized_error(self, mock_admin):
-        mock_admin.return_value = True
-        self.mock_event.payload = "primary@example.com"
-        self.mock_bot.rpc.list_transports.return_value = [{"addr": "primary@example.com"}]
-        self.mock_bot.rpc.set_config.side_effect = RuntimeError("Config write failed")
-        commands.setprimary_command(self.mock_bot, self.accid, self.mock_event)
-        msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
-        self.assertEqual(msg_text, "❌ Failed to set primary transport.")
-
-    # ── /resilient ─────────────────────────────────────────────────────────
-
-    @patch("commands._is_dc_admin")
-    def test_resilient_toggle(self, mock_admin):
-        mock_admin.return_value = True
-
-        # Toggle to ON
-        self.mock_event.payload = ""
-        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
-        self.assertEqual(database.get_config("resilient"), "1")
-        msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
-        self.assertIn("ENABLED", msg_text)
-
-        # Toggle to OFF
-        self.mock_event.payload = ""
-        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
-        self.assertEqual(database.get_config("resilient"), "0")
-        msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
-        self.assertIn("DISABLED", msg_text)
-
-        # Set explicitly ON
-        self.mock_event.payload = "on"
-        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
-        self.assertEqual(database.get_config("resilient"), "1")
-
-        # Set explicitly OFF
-        self.mock_event.payload = "off"
-        commands.resilient_command(self.mock_bot, self.accid, self.mock_event)
-        self.assertEqual(database.get_config("resilient"), "0")
+        for handler, cmd in ((commands.resilient_command, "/resilient"), (commands.setprimary_command, "/setprimary")):
+            self.mock_event.payload = "on" if cmd == "/resilient" else "primary@example.com"
+            handler(self.mock_bot, self.accid, self.mock_event)
+            msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
+            self.assertIn(f"{cmd} is deprecated and disabled", msg_text)
+            self.assertIn("/rmtransport", msg_text)
+        self.assertIsNone(database.get_config("resilient"))
+        self.mock_bot.rpc.set_config.assert_not_called()
 
     # ── /transports ────────────────────────────────────────────────────────
 
     @patch("commands._is_dc_admin")
     def test_transports_list_success(self, mock_admin):
         mock_admin.return_value = True
-        self.mock_bot.rpc.list_transports.return_value = [{"addr": "relay1@example.com"}]
+        self.mock_bot.rpc.list_transports.return_value = [{"addr": "relay1@example.com"}, {"addr": "relay2@example.com"}]
         commands.transports_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
         self.assertIn("Configured Transports", msg_text)
-        self.assertIn("relay1@example.com", msg_text)
+        # Newest relay is tried first by the core, so it is listed first.
+        self.assertIn("1. `relay2@example.com`", msg_text)
+        self.assertIn("2. `relay1@example.com`", msg_text)
 
     @patch("commands._is_dc_admin")
     def test_transports_sanitized_error(self, mock_admin):

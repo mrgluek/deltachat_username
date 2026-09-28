@@ -99,13 +99,6 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(stats_map[addr2]["msgs_sent"], 0)
         self.assertEqual(stats_map[addr2]["msgs_received"], 1)
 
-    def test_resilient_flag(self):
-        self.assertFalse(database.get_config("resilient") == "1")
-        database.set_config("resilient", "1")
-        self.assertEqual(database.get_config("resilient"), "1")
-        database.set_config("resilient", "0")
-        self.assertEqual(database.get_config("resilient"), "0")
-
     def test_cleanup_old_records(self):
         res = database.cleanup_old_records()
         self.assertEqual(res.get("status"), "ok")
