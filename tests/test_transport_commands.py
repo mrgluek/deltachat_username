@@ -242,10 +242,10 @@ class TestTransportCommands(unittest.TestCase):
         self.mock_bot.rpc.list_transports.return_value = [{"addr": "relay1@example.com"}, {"addr": "relay2@example.com"}]
         commands.transports_command(self.mock_bot, self.accid, self.mock_event)
         msg_text = self.mock_bot.rpc.send_msg.call_args[0][2].text
-        self.assertIn("Configured Transports", msg_text)
-        # Newest relay is tried first by the core, so it is listed first.
-        self.assertIn("1. `relay2@example.com`", msg_text)
-        self.assertIn("2. `relay1@example.com`", msg_text)
+        self.assertIn("Mail Relays (Transports)", msg_text)
+        self.assertIn("`relay1@example.com`", msg_text)
+        self.assertIn("`relay2@example.com`", msg_text)
+        self.assertNotIn("Sent:", msg_text)
 
     @patch("commands._is_dc_admin")
     def test_transports_sanitized_error(self, mock_admin):

@@ -6,6 +6,7 @@ from deltachat2 import events, MsgData
 from deltabot_cli import BotCli
 
 import database
+import transports_view
 import identicon
 from dc_helpers import (
     is_group_chat,
@@ -23,7 +24,7 @@ from formatting import (
     validate_invite_link,
 )
 
-VERSION = "1.10.0"
+VERSION = "1.11.0"
 
 dc_cli = BotCli("usernamebot")
 
@@ -479,13 +480,6 @@ def on_new_message(bot, accid, event):
     if msg.is_info:
         return
 
-    try:
-        addr = bot.rpc.get_config(accid, "configured_addr") or bot.rpc.get_config(accid, "addr")
-        if addr:
-            database.increment_transport_received(addr)
-    except Exception:
-        pass
-
     # Automatically sync sender's active email relay & display name if they own a username
     try:
         chat_id = str(msg.chat_id)
@@ -591,19 +585,10 @@ def transports_command(bot, accid, event):
         _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="No transports configured."))
         return
 
-    database.flush_transport_stats()
-    stats_map = {s["addr"]: s for s in database.get_all_transport_stats()}
-    # The core tries the newest relay first when sending, so list newest first.
-    lines = ["📡 **Configured Transports** (sending order; core falls back to the next relay if one is unreachable):\n"]
-
-    for idx, t in enumerate(reversed(transports), 1):
-        addr = t.get("addr", "") if isinstance(t, dict) else getattr(t, "addr", "")
-        s = stats_map.get(addr, {})
-        sent = s.get("msgs_sent", 0)
-        recv = s.get("msgs_received", 0)
-        lines.append(f"{idx}. `{addr}` — Sent: {sent}, Recv: {recv}")
-
-    _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text="\n".join(lines)))
+    # Which relay the core really sends through, its send queue, and per-relay
+    # incoming status and storage (see transports_view.py).
+    reply = transports_view.build_transports_report(bot.rpc, accid, transports)
+    _dc_send_msg_with_stats(bot, accid, msg.chat_id, MsgData(text=reply))
 
 
 @dc_cli.on(events.NewMessage(command="/addtransport"))

@@ -328,11 +328,5 @@ def _get_contact_fingerprint(bot, accid: int, contact_id: int, contact=None) -> 
 
 
 def _dc_send_msg_with_stats(bot, accid: int, chat_id: int, msg_data: MsgData):
-    """Send a message via Delta Chat RPC and update sent statistics."""
+    """Send a message via Delta Chat RPC."""
     bot.rpc.send_msg(accid, chat_id, msg_data)
-    try:
-        addr = bot.rpc.get_config(accid, "configured_addr") or bot.rpc.get_config(accid, "addr")
-        if addr:
-            database.increment_transport_sent(addr)
-    except Exception:
-        pass

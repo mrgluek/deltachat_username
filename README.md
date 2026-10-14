@@ -14,7 +14,7 @@ A Delta Chat bot and FastAPI web service for registering custom usernames and ge
 - 🔀 **HTTP 307 Temporary Redirect**: Guarantees browsers and proxies always fetch the newest invite link without aggressive caching.
 - 🌐 **Web Landing Page**: Beautiful dark-mode glassmorphism interface on `GET /` displaying bot description, QR code, and interactive command hints.
 - 🛡️ **Secure Administration**: Authenticate ownership via `/initadmin` with cryptographic fingerprint verification.
-- 📡 **Multi-Transport & Statistics**: Track sent/received relay stats and configure backup transports.
+- 📡 **Multi-Transport**: Configure backup transports and see which relay the core sends through (`/transports`).
 
 ---
 
@@ -76,11 +76,11 @@ Send `/initadmin` to the bot in a private message in Delta Chat to complete admi
 | `/url <url>` | Admin | Set base domain URL (`https://deltachat.id`). |
 | `/inviteurl <url>` | Admin | Set custom invite base URL/mirror (`https://i.gluek.info/#`). |
 | `/stats` | Admin | Show registered usernames and database stats. |
-| `/transports` | Admin | List configured mail relays and statistics. |
+| `/transports` | Admin | Show mail relays: relay used for sending, send queue, incoming status and storage. |
 | `/addtransport <uri/creds>` | Admin (Private) | Add a backup mail transport relay. |
 | `/rmtransport <addr>` | Admin | Remove a configured mail transport. |
 
-Relay selection and failover are handled by the Delta Chat core (2.61+): it sends via the newest relay first and falls back to the next one if a relay is unreachable. `/transports` lists relays in that order. The former `/setprimary` and `/resilient` commands are deprecated and only reply with this explanation.
+Relay selection and failover are handled by the Delta Chat core (2.61+): it keeps sending through the relay that last worked and moves to the next one only if it cannot connect, so the relay used for sending can differ from the account's main address. `/transports` shows which relay that is, the core's send queue, and per relay the incoming status, the last received message and mailbox storage. The former `/setprimary` and `/resilient` commands are deprecated and only reply with this explanation.
 
 ---
 
