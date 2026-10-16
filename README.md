@@ -14,6 +14,7 @@ A Delta Chat bot and FastAPI web service for registering custom usernames and ge
 - 🔀 **HTTP 307 Temporary Redirect**: Guarantees browsers and proxies always fetch the newest invite link without aggressive caching.
 - 🌐 **Web Landing Page**: Beautiful dark-mode glassmorphism interface on `GET /` displaying bot description, QR code, and interactive command hints.
 - 🛡️ **Secure Administration**: Authenticate ownership via `/initadmin` with cryptographic fingerprint verification.
+- 🤝 **Lookup API for Bots** (`GET /api/username/<name>`): returns `{username, type, display_name, url}` as JSON, or 404 `{"error": "not_found"}`. Bouncer Bot uses it to point people to a mentioned user who is not in the group. It returns no email or fingerprint, and shares the 10 requests/minute per IP limit with profile pages (429 `{"error": "rate_limited"}`).
 - 📡 **Multi-Transport**: Configure backup transports and see which relay the core sends through (`/transports`).
 
 ---

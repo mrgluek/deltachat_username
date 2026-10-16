@@ -5,6 +5,11 @@ All notable changes to the **Delta Chat Username Bot (`deltachat_username`)** wi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-10-16
+
+### Added
+- **Lookup API for Bots (`GET /api/username/<name>`)**: JSON with the username, its type (`contact`, `group` or `channel`), display name and short link (`https://deltachat.id/<name>`); 404 `{"error": "not_found"}` for a name nobody claimed. Bouncer Bot uses it for `@mentions` of people who are not in a group. Unlike the profile page it returns no email address or fingerprint. Requests count against the same limit as profile pages (10 per minute per IP, 429 `{"error": "rate_limited"}`). Other bots cannot use `/username` for this: deltabot-cli ignores messages from bots, and the answer would arrive asynchronously.
+
 ## [1.11.0] - 2026-10-14
 - **`/transports` Shows the Relay Actually Used for Sending**: Since core 2.61 the core sends through the relay that last worked and switches only when it cannot connect, so the main address (`configured_addr`) says nothing about where mail goes out. `/transports` now lists relays in the order the core tries them, with the current sending relay first, shows the core's send queue (waiting messages and retries) and outgoing status, and per relay the incoming status, when the last message arrived, mailbox storage usage (⚠️ from 80%) and when it was added. The sending order and queue are read from the core's account database (read-only); the report is built by the shared `transports_view.py`.
 - **Removed Misleading Per-Relay Sent/Received Counters**: They credited every message to `configured_addr` (or, in some places, the wrong address), so the numbers and "last sent" dates were wrong once the core sent through another relay. Counting them also cost extra RPC calls per message. The `transport_stats` table is left in place but no longer updated.
