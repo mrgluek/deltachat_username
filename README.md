@@ -128,3 +128,7 @@ If you find this bot useful, consider supporting its development:
   - ☕️ [Ko-fi](https://ko-fi.com/gluek) (world cards, PayPal)
   - 🚀 [Tribute](https://web.tribute.tg/d/IWb) (Russian cards, SBP)
   - Or use the `/donate` command in Delta Chat.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

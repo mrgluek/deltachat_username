@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.13.0] - 2026-10-16
 
 ### Added
+- **MIT License**: the project is now licensed under MIT (`LICENSE`).
 - **Invite Link in the Lookup API**: `GET /api/username/<name>` now also returns `invite_link`, the invite on `i.delta.chat` (the same link `/username` sends as the card caption; mirror domains such as `i.deltachat.id` are turned into `i.delta.chat`). Delta Chat apps open it directly, while the short link `url` goes through the browser first. Like `/username` and the profile page, it contains the address and fingerprint the user published.
 
 ## [1.12.0] - 2026-10-16
