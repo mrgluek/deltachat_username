@@ -1,7 +1,7 @@
 import os
 
 from fastapi import FastAPI, Response, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 
 import database
 import identicon
@@ -230,6 +230,29 @@ def get_index_page(request: Request):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "usernames_claimed": database.get_username_count()}
+
+
+@app.get("/api/username/{username}")
+def api_username_lookup(username: str, request: Request):
+    """Look up a username for other bots (e.g. Bouncer Bot's @mentions).
+    Returns only what the public profile page shows anyway, minus the email
+    and fingerprint: the name, whether it is a person, group or channel, and the short link."""
+    if is_rate_limited(get_client_ip(request)):
+        return JSONResponse({"error": "rate_limited"}, status_code=429, headers={"Retry-After": "60"})
+
+    clean_username = username.strip().lower()
+    claim = database.get_username_claim(clean_username)
+    if not claim or not claim.get("invite_link"):
+        return JSONResponse({"error": "not_found"}, status_code=404)
+
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    base_url = (database.get_config("base_url") or BASE_URL).rstrip("/")
+    return {
+        "username": clean_username,
+        "type": metadata.get("target_type") or "contact",
+        "display_name": metadata.get("display_name") or "",
+        "url": f"{base_url}/{clean_username}",
+    }
 
 
 @app.get("/{username}")

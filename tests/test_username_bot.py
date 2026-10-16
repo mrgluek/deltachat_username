@@ -173,6 +173,25 @@ class TestUsernameBot(unittest.TestCase):
         self.assertIn("https://i.gluek.info/#ABC12345?v=3&i=1&s=2&a=test&n=test", res.text)
         self.assertIn("window.location.replace", res.text)
 
+    def test_api_username_lookup(self):
+        clear_rate_limits()
+        res = self.client.get("/api/username/nobody")
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json(), {"error": "not_found"})
+
+        link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
+        database.claim_username("gluek", link, "chat_100")
+        res = self.client.get("/api/username/GLUEK")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["username"], "gluek")
+        self.assertEqual(data["type"], "contact")
+        self.assertEqual(data["display_name"], "Gluek")
+        self.assertTrue(data["url"].endswith("/gluek"))
+        # No email or fingerprint for bots
+        self.assertNotIn("chatmail.uk", res.text)
+        self.assertNotIn("DFF2CAB1", res.text)
+
     def test_rate_limiting_get_username(self):
         clear_rate_limits()
 
