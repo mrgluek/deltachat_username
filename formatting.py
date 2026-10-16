@@ -104,6 +104,14 @@ def rewrite_invite_link(url: str) -> str:
     return url
 
 
+def to_official_invite_link(link: str) -> str:
+    """The invite link on i.delta.chat, which Delta Chat apps open directly
+    (a mirror domain like i.deltachat.id would go through the browser)."""
+    if "/#" in link:
+        return "https://i.delta.chat/#" + link[link.find("/#") + 2 :]
+    return link
+
+
 def validate_username_format(username: str) -> tuple[bool, str]:
     """Validate username rules: length >= 3, alphanumeric with underscores/hyphens."""
     clean = username.strip()
