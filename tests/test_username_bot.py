@@ -188,9 +188,12 @@ class TestUsernameBot(unittest.TestCase):
         self.assertEqual(data["type"], "contact")
         self.assertEqual(data["display_name"], "Gluek")
         self.assertTrue(data["url"].endswith("/gluek"))
-        # No email or fingerprint for bots
-        self.assertNotIn("chatmail.uk", res.text)
-        self.assertNotIn("DFF2CAB1", res.text)
+        self.assertEqual(data["invite_link"], link)
+
+        # A mirror domain is turned into i.delta.chat, which the apps open directly
+        database.claim_username("mirror", "https://i.gluek.info/#ABC12345&v=3&i=1&s=2&a=m%40x.org&n=Mirror", "chat_101")
+        res = self.client.get("/api/username/mirror")
+        self.assertTrue(res.json()["invite_link"].startswith("https://i.delta.chat/#ABC12345"))
 
     def test_rate_limiting_get_username(self):
         clear_rate_limits()

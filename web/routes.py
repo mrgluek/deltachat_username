@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, File
 import database
 import identicon
 from security import get_client_ip, is_rate_limited
-from formatting import BASE_URL, get_request_base_url, rewrite_invite_link, generate_qr_data_uri
+from formatting import BASE_URL, get_request_base_url, rewrite_invite_link, generate_qr_data_uri, to_official_invite_link
 
 app = FastAPI(title="Delta Chat Username Service")
 
@@ -234,9 +234,9 @@ def health_check():
 
 @app.get("/api/username/{username}")
 def api_username_lookup(username: str, request: Request):
-    """Look up a username for other bots (e.g. Bouncer Bot's @mentions).
-    Returns only what the public profile page shows anyway, minus the email
-    and fingerprint: the name, whether it is a person, group or channel, and the short link."""
+    """Look up a username for other bots (e.g. Bouncer Bot's @mentions): the name,
+    whether it is a person, group or channel, the short link and the invite link
+    on i.delta.chat (the same one /username sends), which Delta Chat apps open directly."""
     if is_rate_limited(get_client_ip(request)):
         return JSONResponse({"error": "rate_limited"}, status_code=429, headers={"Retry-After": "60"})
 
@@ -252,6 +252,7 @@ def api_username_lookup(username: str, request: Request):
         "type": metadata.get("target_type") or "contact",
         "display_name": metadata.get("display_name") or "",
         "url": f"{base_url}/{clean_username}",
+        "invite_link": to_official_invite_link(metadata.get("canonical_link") or claim["invite_link"]),
     }
 
 

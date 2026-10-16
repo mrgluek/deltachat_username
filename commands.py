@@ -20,11 +20,12 @@ from formatting import (
     format_username_card_text,
     get_invite_base_url,
     rewrite_invite_link,
+    to_official_invite_link,
     validate_username_format,
     validate_invite_link,
 )
 
-VERSION = "1.12.0"
+VERSION = "1.13.0"
 
 dc_cli = BotCli("usernamebot")
 
@@ -180,11 +181,7 @@ def _send_username_card_reply(
 ):
     """Send visual WebP card image attachment accompanied by direct i.delta.chat invite link."""
     metadata = identicon.parse_invite_metadata(invite_link, updated_at)
-    raw_link = metadata.get("canonical_link") or invite_link
-    if "/#" in raw_link:
-        canonical_link = "https://i.delta.chat/#" + raw_link[raw_link.find("/#") + 2 :]
-    else:
-        canonical_link = raw_link
+    canonical_link = to_official_invite_link(metadata.get("canonical_link") or invite_link)
 
     caption = canonical_link
     card_file = identicon.get_or_create_card_webp_path(username, metadata, base_url=base_url)
