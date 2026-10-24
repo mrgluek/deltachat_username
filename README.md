@@ -31,33 +31,39 @@ cp .env.example .env
 docker compose build
 ```
 
-### 2. Initialize Delta Chat Account
+### 2. Configure Email and Admin (Optional)
 
-Initialize the bot's account in Delta Chat CLI (`deltabot-cli`):
+Skip this step and the bot creates its account by itself at first start: the Delta Chat core (2.62+) picks the fastest chatmail relay from its built-in list and later adds further relays in the background.
+
+To choose the account yourself, initialize it with your email and password, or with `DCACCOUNT:server.tld` for an account on a specific chatmail relay:
 
 ```bash
-# Option A: Automatic setup on a Chatmail server (e.g. chatmail.uk or nine.testrun.org)
-docker compose run --rm username_bot python bot.py init usernamebot@chatmail.uk
-
-# Option B: Standard email account with password
 docker compose run --rm username_bot python bot.py init usernamebot@yourdomain.com "your_password"
+docker compose run --rm username_bot python bot.py init DCACCOUNT:server.tld
 ```
 
-### 3. (Optional) Pre-configure Admin Email / Fingerprint
+Configure your admin email address and your cryptographic fingerprint on the server (or do it later inside the bot chat with the `/initadmin` command):
 
 ```bash
 docker compose run --rm username_bot python set_admin.py --email admin@yourdomain.com
+docker compose run --rm username_bot python set_admin.py --fingerprint 1234ABCD1234ABCD1234ABCD1234ABCD1234ABCD
 ```
 
-### 4. Launch Bot Daemon
+### 3. Launch Bot Daemon
 
 ```bash
 docker compose up -d
 ```
 
-### 5. Claim Administrative Ownership
+### 4. Claim Administrative Ownership
 
 Send `/initadmin` to the bot in a private message in Delta Chat to complete admin identity verification.
+
+### 5. Updates
+
+Run `./update.sh` (e.g. from cron) to deploy the newest release: the highest `vX.Y.Z` tag, from GitHub or, when GitHub is unreachable, from the Forgejo mirror; `-f` rebuilds the container without changes. Commits on `main` that are not released yet are not deployed. In `.env.local`, `UPDATE_REF=v1.13.0` stays on that release (to roll back; remove it to follow new releases again), `UPDATE_REF=main` follows the branch, and `MONITOR_URL` pings a healthcheck on start, success and failure.
+
+Releasing: merge, then `git tag -a vX.Y.Z -m "..." <commit> && git push origin vX.Y.Z`. Pushing the tag publishes the GitHub release with that version's `CHANGELOG.md` section (the tag must match `VERSION` in `commands.py`), then sends the ntfy notification and the Home Assistant add-on sync.
 
 ---
 
