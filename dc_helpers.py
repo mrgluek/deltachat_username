@@ -7,6 +7,9 @@ from deltachat2 import MsgData
 
 import database
 
+# Attachments over 64 KB are not downloaded automatically: the bot only reads commands
+DOWNLOAD_LIMIT = 65536
+
 
 def configure_bot_profile(bot, accid: int):
     """Configure bot display name, status text, and avatar icon from environment or default files."""
@@ -67,6 +70,11 @@ def configure_bot_profile(bot, accid: int):
                 break
     except Exception as e:
         bot.logger.warning(f"Failed to set selfavatar: {e}")
+
+    try:
+        bot.rpc.set_config(accid, "download_limit", str(DOWNLOAD_LIMIT))
+    except Exception as e:
+        bot.logger.warning(f"Failed to set download_limit: {e}")
 
 
 def is_group_chat(bot, accid: int, chat_id: int) -> bool:

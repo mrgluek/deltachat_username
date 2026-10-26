@@ -5,6 +5,11 @@ All notable changes to the **Delta Chat Username Bot (`deltachat_username`)** wi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.1] - 2026-10-26
+
+### Changed
+- **Download Limit 64 KB**: Photos, videos and files over 64 KB sent to the bot are no longer downloaded automatically (the bot only reads commands), saving traffic and disk space. Plain text and small attachments arrive as before.
+
 ## [1.14.0] - 2026-10-24
 
 ### Added
