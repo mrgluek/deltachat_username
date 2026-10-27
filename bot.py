@@ -7,6 +7,7 @@ import time
 
 import uvicorn
 
+import contact_sync
 import database
 from web.routes import app
 from security import (
@@ -131,6 +132,22 @@ def on_start(bot, _args):
                 bot.logger.error(f"Error in background cleanup worker: {e}")
 
     threading.Thread(target=_bg_cleanup_worker, daemon=True).start()
+
+    def _bg_contact_sync_worker():
+        # Relay changes arrive as core keyupdates that fire no message event,
+        # so personal links are re-checked against the core's contact data periodically
+        time.sleep(120)
+        while True:
+            try:
+                for accid in bot.rpc.get_all_account_ids():
+                    changed = contact_sync.sync_all_claims(bot, accid)
+                    if changed:
+                        bot.logger.info(f"Contact sync: {changed} invite link(s) updated")
+            except Exception as e:
+                bot.logger.error(f"Error in contact sync worker: {e}")
+            time.sleep(contact_sync.SYNC_INTERVAL_SECONDS)
+
+    threading.Thread(target=_bg_contact_sync_worker, daemon=True).start()
 
     accounts = bot.rpc.get_all_account_ids()
     if accounts:

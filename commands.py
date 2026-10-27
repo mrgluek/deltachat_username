@@ -5,6 +5,7 @@ import time
 from deltachat2 import events, MsgData
 from deltabot_cli import BotCli
 
+import contact_sync
 import database
 import transports_view
 import identicon
@@ -25,7 +26,7 @@ from formatting import (
     validate_invite_link,
 )
 
-VERSION = "1.15.1"
+VERSION = "1.16.0"
 
 dc_cli = BotCli("usernamebot")
 
@@ -482,25 +483,13 @@ def on_new_message(bot, accid, event):
     if msg.is_info:
         return
 
-    # Automatically sync sender's active email relay & display name if they own a username
+    # Sync the sender's address, relays and name into their link (only if it's their key)
     try:
-        chat_id = str(msg.chat_id)
-        claim = database.get_username_by_chat(chat_id)
+        claim = database.get_username_by_chat(str(msg.chat_id))
         if claim and claim.get("invite_link") and msg.from_id:
-            contact = bot.rpc.get_contact(accid, msg.from_id)
-            if contact:
-                user_email = getattr(contact, "addr", "")
-                user_name = getattr(contact, "display_name", "") or getattr(contact, "name", "")
-                updated_link, changed = identicon.update_invite_link_contact_info(
-                    claim["invite_link"],
-                    new_email=user_email,
-                    new_display_name=user_name,
-                )
-                if changed:
-                    database.update_username_invite_metadata(claim["username"], updated_link)
-                    identicon.clear_png_cache()
-    except Exception:
-        pass
+            contact_sync.sync_claim(bot, accid, claim, msg.from_id)
+    except Exception as e:
+        bot.logger.debug(f"Contact sync on message failed: {e}")
 
     _is_dc_admin(bot, accid, msg.from_id)
 

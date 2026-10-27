@@ -14,7 +14,7 @@ import os
 import re
 import tempfile
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional
 from urllib.parse import parse_qs, unquote, quote_plus
 from xml.sax.saxutils import escape as xml_escape
 
@@ -287,14 +287,23 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
     return result
 
 
+# Delta Chat core reads at most this many addresses from `a` + `r` (MAX_RELAYS in core)
+MAX_LINK_RELAYS = 5
+
+
 def update_invite_link_contact_info(
     invite_link: str,
     new_email: Optional[str] = None,
     new_display_name: Optional[str] = None,
+    new_relays: Optional[List[str]] = None,
 ) -> Tuple[str, bool]:
     """
-    Updates email and display_name parameters in a personal Delta Chat invite link if changed.
+    Updates email, relay and display_name parameters in a personal Delta Chat invite link if changed.
     Preserves cryptographic tokens, keys, and formatting.
+
+    `new_relays` is the contact's relay list from their key (newest core publishes it there).
+    When given, `a` becomes one of those relays (`new_email` if listed, else the current `a`
+    if still listed, else the first relay) and `r` lists the others, as the core's own links do.
     Returns (updated_link, is_changed).
     """
     if not invite_link or "/#" not in invite_link:
@@ -316,9 +325,29 @@ def update_invite_link_contact_info(
     if "g" in params or "b" in params or "z" in params:
         return invite_link, False
 
-    if new_email and new_email.strip():
+    current_email = params.get("a", [""])[0].strip()
+    relays = [r.strip() for r in (new_relays or []) if "@" in r][:MAX_LINK_RELAYS]
+    if relays:
+        relays_lower = [r.lower() for r in relays]
+        if new_email and new_email.strip().lower() in relays_lower:
+            primary = relays[relays_lower.index(new_email.strip().lower())]
+        elif current_email.lower() in relays_lower:
+            primary = relays[relays_lower.index(current_email.lower())]
+        else:
+            primary = relays[0]
+        extra = [r for r in relays if r.lower() != primary.lower()]
+        current_extra = [r for r in params.get("r", [""])[0].split(",") if r]
+        if current_email != primary:
+            params["a"] = [primary]
+            changed = True
+        if [r.lower() for r in current_extra] != [r.lower() for r in extra]:
+            if extra:
+                params["r"] = [",".join(extra)]
+            else:
+                params.pop("r", None)
+            changed = True
+    elif new_email and new_email.strip():
         clean_email = new_email.strip()
-        current_email = unquote(params.get("a", [""])[0])
         if current_email != clean_email:
             params["a"] = [clean_email]
             changed = True
@@ -333,16 +362,23 @@ def update_invite_link_contact_info(
     if not changed:
         return invite_link, False
 
-    ordered_keys = ["v", "x", "i", "s", "a", "n"]
+    def _encode(key: str, value: str) -> str:
+        # `r` is a comma-separated address list: the core splits it on raw commas,
+        # so each address is encoded on its own (a quoted "," would become %2C)
+        if key == "r":
+            return ",".join(quote_plus(part) for part in value.split(","))
+        return quote_plus(value)
+
+    ordered_keys = ["v", "x", "i", "s", "a", "r", "n"]
     query_parts = []
     for k in ordered_keys:
         if k in params:
             for v in params[k]:
-                query_parts.append(f"{k}={quote_plus(v)}")
+                query_parts.append(f"{k}={_encode(k, v)}")
     for k, vals in params.items():
         if k not in ordered_keys:
             for v in vals:
-                query_parts.append(f"{k}={quote_plus(v)}")
+                query_parts.append(f"{k}={_encode(k, v)}")
 
     new_query = "&".join(query_parts)
     updated_link = f"{prefix}/#{fp_part}&{new_query}"
