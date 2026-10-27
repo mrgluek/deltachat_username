@@ -250,6 +250,7 @@ def api_username_lookup(username: str, request: Request):
     return {
         "username": clean_username,
         "type": metadata.get("target_type") or "contact",
+        "arcanechat_only": bool(metadata.get("arcanechat_only")),
         "display_name": metadata.get("display_name") or "",
         "url": f"{base_url}/{clean_username}",
         "invite_link": to_official_invite_link(metadata.get("canonical_link") or claim["invite_link"]),
@@ -306,8 +307,11 @@ def redirect_username(username: str, request: Request):
         title_name = metadata.get("display_name") or clean_username
         og_title = f"{title_name} (@{clean_username}) • Delta Chat"
         fp_l1, fp_l2 = metadata.get("formatted_fp", ("", ""))
+        arcanechat_only = bool(metadata.get("arcanechat_only"))
         if metadata.get("target_type") == "group":
             target_desc = f"👥 Group: {metadata.get('display_name')}"
+            if arcanechat_only:
+                target_desc += " (ArcaneChat only)"
         elif metadata.get("target_type") == "channel":
             target_desc = f"📢 Channel: {metadata.get('display_name')}"
         else:
@@ -320,6 +324,24 @@ def redirect_username(username: str, request: Request):
             f"📅 Linked: {metadata.get('relative_time')}"
         )
         og_img = f"{base_url}/{clean_username}/og.png"
+
+        # ArcaneChat admin groups must not auto-redirect: Delta Chat would open a 1:1 chat instead
+        if arcanechat_only:
+            redirect_script = ""
+            notice_html = (
+                '<p class="notice">⚠️ This is an ArcaneChat admin group. It opens only in ArcaneChat '
+                '&mdash; Delta Chat would open a 1:1 chat with the inviter instead. '
+                '<a href="https://arcanechat.me">arcanechat.me</a></p>'
+            )
+            button_text = "💬 Open in ArcaneChat"
+        else:
+            redirect_script = f'''<script>
+        if (!window.location.search.includes("preview=1")) {{
+            window.location.replace("{target_link}");
+        }}
+    </script>'''
+            notice_html = ""
+            button_text = "💬 Open in Delta Chat"
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -343,11 +365,7 @@ def redirect_username(username: str, request: Request):
     <meta name="twitter:description" content="{og_desc}">
     <meta name="twitter:image" content="{og_img}">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <script>
-        if (!window.location.search.includes("preview=1")) {{
-            window.location.replace("{target_link}");
-        }}
-    </script>
+    {redirect_script}
     <style>
         body {{
             background: #0f172a; color: #f8fafc;
@@ -364,6 +382,8 @@ def redirect_username(username: str, request: Request):
         h1 {{ font-size: 1.8rem; margin-bottom: 6px; }}
         p.sub {{ color: #38bdf8; font-weight: 600; margin-bottom: 20px; }}
         .fp {{ font-family: monospace; background: #020617; padding: 12px; border-radius: 10px; font-size: 0.9rem; color: #38bdf8; margin: 15px 0; word-break: break-all; }}
+        .notice {{ background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; padding: 12px; border-radius: 10px; font-size: 0.9rem; }}
+        .notice a {{ color: #38bdf8; }}
         .btn {{ display: inline-block; background: #38bdf8; color: #0f172a; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; margin-top: 20px; }}
     </style>
 </head>
@@ -374,7 +394,8 @@ def redirect_username(username: str, request: Request):
         <p>Linked {metadata.get('relative_time')}</p>
         <div class="fp">{fp_l1}<br>{fp_l2}</div>
         <p style="font-size: 1.5rem; margin: 10px 0;">{metadata.get('emoji_hash')}</p>
-        <a href="{target_link}" class="btn">💬 Open in Delta Chat</a>
+        {notice_html}
+        <a href="{target_link}" class="btn">{button_text}</a>
     </div>
 </body>
 </html>

@@ -203,6 +203,8 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
     - email (address from `a` param)
     - display_name (name from `n` param)
     - target_type ('contact', 'group', 'channel', or 'broadcast')
+    - arcanechat_only (True for ArcaneChat admin-group links with a `z` param: upstream
+      Delta Chat does not know `z` and would open a 1:1 chat with the inviter instead)
     - identicon (5x5 text identicon)
     - emoji_hash (5-emoji string)
     - relative_time (formatted registration date)
@@ -214,6 +216,7 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
         "email": "",
         "display_name": "",
         "target_type": "contact",
+        "arcanechat_only": False,
         "identicon": "",
         "emoji_hash": "",
         "relative_time": format_relative_time(updated_at_iso),
@@ -251,7 +254,15 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
             result["email"] = unquote(params["a"][0].strip())
 
         # Determine target type & primary display name
-        if "g" in params and params["g"][0]:
+        if "z" in params and params["z"][0].strip():
+            # ArcaneChat admin group: `z` holds the group name
+            result["target_type"] = "group"
+            result["arcanechat_only"] = True
+            result["group_name"] = unquote(params["z"][0].strip())
+            result["display_name"] = result["group_name"]
+            if "n" in params and params["n"][0]:
+                result["inviter_name"] = unquote(params["n"][0].strip())
+        elif "g" in params and params["g"][0]:
             result["target_type"] = "group"
             result["group_name"] = unquote(params["g"][0].strip())
             result["display_name"] = result["group_name"]
@@ -300,8 +311,8 @@ def update_invite_link_contact_info(
     params = parse_qs(query_str, keep_blank_values=True)
     changed = False
 
-    # Do not mutate group or channel invite links
-    if "g" in params or "b" in params:
+    # Do not mutate group, channel or ArcaneChat admin-group (`z`) invite links
+    if "g" in params or "b" in params or "z" in params:
         return invite_link, False
 
     if new_email and new_email.strip():
@@ -368,6 +379,8 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
     rel_time = metadata.get("relative_time", "")
     target_type_raw = metadata.get("target_type", "contact")
     target_type = target_type_raw.capitalize()
+    if metadata.get("arcanechat_only"):
+        target_type += " • ArcaneChat only"
     if target_type_raw == "group":
         detail_label = "Group"
         detail_val = name
@@ -543,6 +556,8 @@ def generate_og_png_bytes(username: str, metadata: Dict[str, Any], base_url: str
     draw.text((170, 100), "DELTA CHAT", font=font_badge, fill=(56, 189, 248), anchor="mt")
 
     target_type = metadata.get("target_type", "contact").capitalize()
+    if metadata.get("arcanechat_only"):
+        target_type += " • ArcaneChat only"
     rel_time = metadata.get("relative_time", "")
     draw.text((270, 100), f"{target_type} • Linked: {rel_time}", font=font_body, fill=(148, 163, 184))
 

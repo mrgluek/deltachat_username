@@ -121,6 +121,49 @@ class TestIdenticon(unittest.TestCase):
         self.assertEqual(meta_channel["display_name"], "News Channel")
         self.assertEqual(meta_channel["inviter_name"], "Author")
 
+    ARCANE_LINK = (
+        "https://i.delta.chat/#0A45953086F0C166D3BAF1D4BB2025496E4C2704&v=3&x=vLuBQ7TGF_zvE6IV4JOK_oKv"
+        "&i=-b0-STU-4_MWCAkL477_jviE&s=Z9ZxxhR-muwih6i0T1eu6zj6&a=k1yi9ljs0%40chatmail.bsd.cafe"
+        "&n=ArcaneChat&z=ArcaneChat+Community"
+    )
+
+    def test_parse_arcanechat_admin_group(self):
+        meta = identicon.parse_invite_metadata(self.ARCANE_LINK)
+        self.assertEqual(meta["target_type"], "group")
+        self.assertEqual(meta["display_name"], "ArcaneChat Community")
+        self.assertEqual(meta["inviter_name"], "ArcaneChat")
+        self.assertEqual(meta["email"], "k1yi9ljs0@chatmail.bsd.cafe")
+        self.assertTrue(meta["arcanechat_only"])
+
+    def test_arcanechat_only_false_for_other_links(self):
+        group = identicon.parse_invite_metadata("https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&g=Chat+RU&s=sig&n=Bot")
+        contact = identicon.parse_invite_metadata("https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&i=t&s=s&a=a%40b.org&n=A")
+        empty = identicon.parse_invite_metadata("")
+        for meta in (group, contact, empty):
+            self.assertFalse(meta["arcanechat_only"])
+
+    def test_update_contact_info_leaves_arcanechat_link(self):
+        updated, changed = identicon.update_invite_link_contact_info(
+            self.ARCANE_LINK, "other@example.org", "Someone Else"
+        )
+        self.assertFalse(changed)
+        self.assertEqual(updated, self.ARCANE_LINK)
+
+    def test_arcanechat_only_in_cards(self):
+        meta = identicon.parse_invite_metadata(self.ARCANE_LINK, "2026-08-19T10:00:00Z")
+        self.assertIn("Group • ArcaneChat only", identicon.generate_svg_card("ac", meta))
+        self.assertTrue(identicon.generate_og_png_bytes("ac", meta))
+
+        import formatting
+        text = formatting.format_username_card_text("ac", self.ARCANE_LINK, "2026-08-19T10:00:00Z", "https://deltachat.id")
+        self.assertIn("**Group:** ArcaneChat Community", text)
+        self.assertIn("ArcaneChat only", text)
+        self.assertIn("https://arcanechat.me", text)
+        plain = formatting.format_username_card_text(
+            "x", "https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&g=Chat+RU&s=sig&n=Bot", "", "https://deltachat.id"
+        )
+        self.assertNotIn("ArcaneChat only", plain)
+
     def test_generate_svg_card(self):
         url = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=t&s=s&a=test%40example.com&n=Gluek"
         meta = identicon.parse_invite_metadata(url, "2026-08-19T10:00:00Z")

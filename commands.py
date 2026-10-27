@@ -25,7 +25,7 @@ from formatting import (
     validate_invite_link,
 )
 
-VERSION = "1.14.1"
+VERSION = "1.15.0"
 
 dc_cli = BotCli("usernamebot")
 
@@ -411,6 +411,11 @@ def link_command(bot, accid, event):
     identicon.clear_png_cache()
 
     reply_text = f"Done! The invite link for **{target_username}** is now:\n{base_url}/{target_username}"
+    if meta.get("arcanechat_only"):
+        reply_text += (
+            "\n\n⚠️ **ArcaneChat only:** this is an ArcaneChat admin group. It opens only in "
+            "ArcaneChat (https://arcanechat.me); Delta Chat would open a 1:1 chat with the inviter instead."
+        )
     if old_username:
         reply_text += f"\n\n(Previous username `{old_username}` was unlinked)"
 

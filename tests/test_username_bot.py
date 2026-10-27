@@ -24,6 +24,12 @@ from bot import (
 )
 from fastapi.testclient import TestClient
 
+ARCANE_LINK = (
+    "https://i.delta.chat/#0A45953086F0C166D3BAF1D4BB2025496E4C2704&v=3&x=vLuBQ7TGF_zvE6IV4JOK_oKv"
+    "&i=-b0-STU-4_MWCAkL477_jviE&s=Z9ZxxhR-muwih6i0T1eu6zj6&a=k1yi9ljs0%40chatmail.bsd.cafe"
+    "&n=ArcaneChat&z=ArcaneChat+Community"
+)
+
 
 class TestUsernameBot(unittest.TestCase):
     def setUp(self):
@@ -194,6 +200,35 @@ class TestUsernameBot(unittest.TestCase):
         database.claim_username("mirror", "https://i.gluek.info/#ABC12345&v=3&i=1&s=2&a=m%40x.org&n=Mirror", "chat_101")
         res = self.client.get("/api/username/mirror")
         self.assertTrue(res.json()["invite_link"].startswith("https://i.delta.chat/#ABC12345"))
+
+    def test_arcanechat_admin_group_link(self):
+        clear_rate_limits()
+        link = ARCANE_LINK
+        self.assertTrue(validate_invite_link(link))
+        database.claim_username("ac-community", link, "admin_ac-community")
+
+        data = self.client.get("/api/username/ac-community").json()
+        self.assertEqual(data["type"], "group")
+        self.assertTrue(data["arcanechat_only"])
+        self.assertEqual(data["display_name"], "ArcaneChat Community")
+
+        # Normal links report arcanechat_only False
+        database.claim_username("plain", "https://i.delta.chat/#ABC12345&v=3&i=1&s=2&a=m%40x.org&n=Plain", "chat_5")
+        self.assertFalse(self.client.get("/api/username/plain").json()["arcanechat_only"])
+
+        # No auto-redirect, visible notice and ArcaneChat button
+        res = self.client.get("/ac-community")
+        self.assertEqual(res.status_code, 200)
+        self.assertNotIn("window.location.replace", res.text)
+        self.assertIn("ArcaneChat admin group", res.text)
+        self.assertIn("https://arcanechat.me", res.text)
+        self.assertIn("Open in ArcaneChat", res.text)
+        self.assertIn("ArcaneChat only", res.text)  # OG description
+
+        # Normal pages keep the redirect
+        res = self.client.get("/plain")
+        self.assertIn("window.location.replace", res.text)
+        self.assertIn("Open in Delta Chat", res.text)
 
     def test_rate_limiting_get_username(self):
         clear_rate_limits()

@@ -25,6 +25,12 @@ def get_request_base_url(request: Request) -> str:
         return f"{forwarded_proto}://{host}".rstrip("/")
     return database.get_config("base_url") or BASE_URL
 
+ARCANECHAT_ONLY_NOTE = (
+    "⚠️ **ArcaneChat only:** this admin group opens only in ArcaneChat (https://arcanechat.me), "
+    "not in Delta Chat."
+)
+
+
 def format_username_card_text(username: str, invite_link: str, updated_at_iso: str, base_url: str) -> str:
     """Generate rich verification card text with identicon, emoji badge, and formatted fingerprint."""
     metadata = identicon.parse_invite_metadata(invite_link, updated_at_iso)
@@ -43,6 +49,8 @@ def format_username_card_text(username: str, invite_link: str, updated_at_iso: s
     if target_type == "group":
         if metadata.get("display_name"):
             lines.append(f"👥 **Group:** {metadata['display_name']}")
+        if metadata.get("arcanechat_only"):
+            lines.append(ARCANECHAT_ONLY_NOTE)
     elif target_type == "channel":
         if metadata.get("display_name"):
             lines.append(f"📢 **Channel:** {metadata['display_name']}")
