@@ -306,6 +306,45 @@ class TestUsernameBot(unittest.TestCase):
         self.assertIn("DFF2 CAB1 FEB7 182F 997C", res.text)
         self.assertIn("Start Chat in Delta Chat", res.text)
 
+    def test_arcanechat_button_uses_openpgp4fpr(self):
+        database.claim_username("acgroup", ARCANE_LINK, "admin_acgroup")
+        expected = (
+            "openpgp4fpr:0A45953086F0C166D3BAF1D4BB2025496E4C2704#v=3&amp;x=vLuBQ7TGF_zvE6IV4JOK_oKv"
+            "&amp;i=-b0-STU-4_MWCAkL477_jviE&amp;s=Z9ZxxhR-muwih6i0T1eu6zj6"
+            "&amp;a=k1yi9ljs0%40chatmail.bsd.cafe&amp;n=ArcaneChat&amp;z=ArcaneChat+Community"
+        )
+        self.assertIn(f'href="{expected}"', self.client.get("/acgroup").text)
+        card = self.client.get("/acgroup/card").text
+        self.assertIn(f'href="{expected}"', card)
+        self.assertIn("Open in ArcaneChat", card)
+
+    def test_to_openpgp4fpr_link(self):
+        from formatting import to_openpgp4fpr_link
+        self.assertEqual(
+            to_openpgp4fpr_link("https://i.delta.chat/#ABCD&v=3&i=1&s=2&z=G"),
+            "openpgp4fpr:ABCD#v=3&i=1&s=2&z=G",
+        )
+        self.assertEqual(to_openpgp4fpr_link("https://i.delta.chat/#ABCD"), "openpgp4fpr:ABCD")
+
+    def test_pages_escape_user_controlled_values(self):
+        evil = (
+            "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&x=abcdefghijkl&i=1&s=2"
+            "&a=x%40example.org&n=N&g=%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E"
+        )
+        database.claim_username("evil", evil, "admin_evil")
+        for path in ("/evil", "/evil/card", "/evil/og.svg"):
+            text = self.client.get(path).text
+            self.assertNotIn("<script>alert(1)", text, path)
+            self.assertIn("&lt;script&gt;alert(1)", text, path)
+        # The redirect script still works and can't be closed early by the link
+        self.assertIn("window.location.replace(\"https://", self.client.get("/evil").text)
+
+        # The 404 page reflects the requested path
+        res = self.client.get("/%3Cimg%20src=x%20onerror=alert(1)%3E")
+        self.assertEqual(res.status_code, 404)
+        self.assertNotIn("<img src=x", res.text)
+        self.assertIn("&lt;img src=x", res.text)
+
     def test_update_username_invite_metadata_and_sync(self):
         link = "https://i.deltachat.id/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=old%40chatmail.uk&n=Old"
         database.claim_username("synctest", link, "chat_sync")

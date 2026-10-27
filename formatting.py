@@ -120,6 +120,17 @@ def to_official_invite_link(link: str) -> str:
     return link
 
 
+def to_openpgp4fpr_link(link: str) -> str:
+    """The invite as an openpgp4fpr: URI (FINGERPRINT#params), which opens the installed
+    chat app directly instead of going through the browser. Used for ArcaneChat-only links,
+    since i.delta.chat would offer Delta Chat, which can't join them."""
+    if "/#" not in link:
+        return link
+    fragment = link[link.find("/#") + 2 :]
+    fingerprint, _, params = fragment.partition("&")
+    return f"openpgp4fpr:{fingerprint}#{params}" if params else f"openpgp4fpr:{fingerprint}"
+
+
 def validate_username_format(username: str) -> tuple[bool, str]:
     """Validate username rules: length >= 3, alphanumeric with underscores/hyphens."""
     clean = username.strip()

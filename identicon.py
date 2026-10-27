@@ -16,6 +16,7 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional
 from urllib.parse import parse_qs, unquote, quote_plus
+from xml.sax.saxutils import escape as xml_escape
 
 try:
     import resvg_py
@@ -381,6 +382,12 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
     target_type = target_type_raw.capitalize()
     if metadata.get("arcanechat_only"):
         target_type += " • ArcaneChat only"
+    # The SVG is served as image/svg+xml, so user-controlled text must be XML-escaped:
+    # a name with "&" would break the image and one with "<script>" would run on our domain
+    name = xml_escape(name)
+    username = xml_escape(username)
+    base_url = xml_escape(base_url)
+    rel_time = xml_escape(rel_time)
     if target_type_raw == "group":
         detail_label = "Group"
         detail_val = name
@@ -389,7 +396,7 @@ def generate_svg_card(username: str, metadata: Dict[str, Any], base_url: str = "
         detail_val = name
     else:
         detail_label = "Email"
-        detail_val = email or "Not specified"
+        detail_val = xml_escape(email or "Not specified")
 
     fg_r, fg_g, fg_b = get_color_from_fingerprint(fp)
     fg_color = f"rgb({fg_r}, {fg_g}, {fg_b})"

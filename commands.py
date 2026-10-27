@@ -25,7 +25,7 @@ from formatting import (
     validate_invite_link,
 )
 
-VERSION = "1.15.0"
+VERSION = "1.15.1"
 
 dc_cli = BotCli("usernamebot")
 

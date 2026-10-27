@@ -1,4 +1,6 @@
+import json
 import os
+from html import escape
 
 from fastapi import FastAPI, Response, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
@@ -6,7 +8,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, File
 import database
 import identicon
 from security import get_client_ip, is_rate_limited
-from formatting import BASE_URL, get_request_base_url, rewrite_invite_link, generate_qr_data_uri, to_official_invite_link
+from formatting import (
+    BASE_URL,
+    get_request_base_url,
+    rewrite_invite_link,
+    generate_qr_data_uri,
+    to_official_invite_link,
+    to_openpgp4fpr_link,
+)
 
 app = FastAPI(title="Delta Chat Username Service")
 
@@ -44,19 +53,19 @@ def get_index_page(request: Request):
         qr_html = f'''
         <div class="qr-container">
             <img src="{qr_img}" alt="Delta Chat Bot QR Code" class="qr-code">
-            <a href="{bot_invite}" class="btn-primary">💬 Start Chat in Delta Chat</a>
+            <a href="{escape(bot_invite)}" class="btn-primary">💬 Start Chat in Delta Chat</a>
         </div>
         '''
     elif bot_invite:
         qr_html = f'''
         <div class="qr-container">
-            <a href="{bot_invite}" class="btn-primary">💬 Start Chat in Delta Chat</a>
+            <a href="{escape(bot_invite)}" class="btn-primary">💬 Start Chat in Delta Chat</a>
         </div>
         '''
     elif bot_addr:
         qr_html = f'''
         <div class="qr-container">
-            <p>Send an email/message in Delta Chat to: <code>{bot_addr}</code></p>
+            <p>Send an email/message in Delta Chat to: <code>{escape(bot_addr)}</code></p>
         </div>
         '''
 
@@ -325,8 +334,22 @@ def redirect_username(username: str, request: Request):
         )
         og_img = f"{base_url}/{clean_username}/og.png"
 
-        # ArcaneChat admin groups must not auto-redirect: Delta Chat would open a 1:1 chat instead
+        # Everything below comes from the stored invite link, the URL path or request headers,
+        # so it is HTML-escaped before it goes into the page (stored/reflected XSS otherwise)
+        og_title = escape(og_title)
+        og_desc = escape(og_desc)
+        og_img = escape(og_img)
+        page_url = escape(f"{base_url}/{clean_username}")
+        title_name = escape(title_name)
+        username_html = escape(clean_username)
+        relative_time = escape(metadata.get("relative_time") or "")
+        emoji_hash = escape(metadata.get("emoji_hash") or "")
+        fp_l1, fp_l2 = escape(fp_l1), escape(fp_l2)
+
+        # ArcaneChat admin groups must not auto-redirect: Delta Chat would open a 1:1 chat instead.
+        # The button uses the openpgp4fpr: scheme, which opens the installed ArcaneChat app directly.
         if arcanechat_only:
+            button_link = escape(to_openpgp4fpr_link(target_link))
             redirect_script = ""
             notice_html = (
                 '<p class="notice">⚠️ This is an ArcaneChat admin group. It opens only in ArcaneChat '
@@ -335,9 +358,12 @@ def redirect_username(username: str, request: Request):
             )
             button_text = "💬 Open in ArcaneChat"
         else:
+            button_link = escape(target_link)
+            # json.dumps makes a JS string literal; "<" is escaped so "</script>" can't end the tag
+            js_link = json.dumps(target_link).replace("<", "\\u003c")
             redirect_script = f'''<script>
         if (!window.location.search.includes("preview=1")) {{
-            window.location.replace("{target_link}");
+            window.location.replace({js_link});
         }}
     </script>'''
             notice_html = ""
@@ -358,7 +384,7 @@ def redirect_username(username: str, request: Request):
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:type" content="image/png">
-    <meta property="og:url" content="{base_url}/{clean_username}">
+    <meta property="og:url" content="{page_url}">
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{og_title}">
@@ -390,12 +416,12 @@ def redirect_username(username: str, request: Request):
 <body>
     <div class="card">
         <h1>{title_name}</h1>
-        <p class="sub">@{clean_username}</p>
-        <p>Linked {metadata.get('relative_time')}</p>
+        <p class="sub">@{username_html}</p>
+        <p>Linked {relative_time}</p>
         <div class="fp">{fp_l1}<br>{fp_l2}</div>
-        <p style="font-size: 1.5rem; margin: 10px 0;">{metadata.get('emoji_hash')}</p>
+        <p style="font-size: 1.5rem; margin: 10px 0;">{emoji_hash}</p>
         {notice_html}
-        <a href="{target_link}" class="btn">{button_text}</a>
+        <a href="{button_link}" class="btn">{button_text}</a>
     </div>
 </body>
 </html>
@@ -426,7 +452,7 @@ def redirect_username(username: str, request: Request):
 <body>
     <div class="card">
         <h1>404</h1>
-        <p>The username <code>{clean_username}</code> is not registered or has no active invite link.</p>
+        <p>The username <code>{escape(clean_username)}</code> is not registered or has no active invite link.</p>
         <a href="/">Go to Homepage</a>
     </div>
 </body>
@@ -494,18 +520,26 @@ def get_username_card_page(username: str, request: Request):
     metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
     qr_img = generate_qr_data_uri(target_link)
 
-    title_name = metadata.get("display_name") or clean_username
-    line1, line2 = metadata.get("formatted_fp", ("", ""))
+    title_name = escape(metadata.get("display_name") or clean_username)
+    line1, line2 = (escape(v) for v in metadata.get("formatted_fp", ("", "")))
+    username_html = escape(clean_username)
+    base_html = escape(base_url)
+    if metadata.get("arcanechat_only"):
+        button_link = escape(to_openpgp4fpr_link(target_link))
+        button_text = "💬 Open in ArcaneChat"
+    else:
+        button_link = escape(target_link)
+        button_text = "💬 Start Chat in Delta Chat"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title_name} (@{clean_username}) • Delta Chat</title>
+    <title>{title_name} (@{username_html}) • Delta Chat</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <meta property="og:title" content="{title_name} (@{clean_username}) • Delta Chat">
-    <meta property="og:image" content="{base_url}/{clean_username}/og.png">
+    <meta property="og:title" content="{title_name} (@{username_html}) • Delta Chat">
+    <meta property="og:image" content="{base_html}/{username_html}/og.png">
     <style>
         body {{
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
@@ -534,14 +568,14 @@ def get_username_card_page(username: str, request: Request):
 </head>
 <body>
     <div class="card">
-        <img src="/{clean_username}/og.svg" alt="Identicon" class="avatar">
+        <img src="/{username_html}/og.svg" alt="Identicon" class="avatar">
         <h1>{title_name}</h1>
-        <div class="username">@{clean_username}</div>
-        <span class="badge">Linked: {metadata.get('relative_time')}</span>
+        <div class="username">@{username_html}</div>
+        <span class="badge">Linked: {escape(metadata.get('relative_time') or '')}</span>
 
         <div class="info-box">
             <div class="info-label">Email</div>
-            <div><code>{metadata.get('email') or 'Not specified'}</code></div>
+            <div><code>{escape(metadata.get('email') or 'Not specified')}</code></div>
         </div>
 
         <div class="info-box">
@@ -551,12 +585,12 @@ def get_username_card_page(username: str, request: Request):
 
         <div class="info-box" style="text-align: center;">
             <div class="info-label">Visual Key Badge</div>
-            <div style="font-size: 1.6rem; margin-top: 4px;">{metadata.get('emoji_hash')}</div>
+            <div style="font-size: 1.6rem; margin-top: 4px;">{escape(metadata.get('emoji_hash') or '')}</div>
         </div>
 
         {f'<div class="qr-box"><img src="{qr_img}" class="qr-code"></div>' if qr_img else ''}
 
-        <a href="{target_link}" class="btn">💬 Start Chat in Delta Chat</a>
+        <a href="{button_link}" class="btn">{button_text}</a>
     </div>
 </body>
 </html>
