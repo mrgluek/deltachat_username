@@ -26,6 +26,8 @@ ENC_INFO = (
 )
 
 BOB_LINK = f"https://i.delta.chat/#{BOB_FP}&v=3&i=inv&s=auth&a=bob%40example.net&n=Bob"
+# The bot's (alice's) own invite link: dc_fingerprint tells her key block from Bob's by it
+ALICE_INVITE = "https://i.delta.chat/#CB0152E1D9F6E11EFDE54D1DC04B874C77FA1390&v=3&i=a&s=b&a=alice%40example.org"
 
 
 def _params(link):
@@ -33,16 +35,6 @@ def _params(link):
 
 
 class TestParsing(unittest.TestCase):
-    def test_contact_fingerprint_picked_by_address(self):
-        self.assertEqual(contact_sync.parse_contact_fingerprint(ENC_INFO, "bob@example.net"), BOB_FP)
-        # The bot's own block is never taken for the contact's
-        self.assertEqual(
-            contact_sync.parse_contact_fingerprint(ENC_INFO, "alice@example.org"),
-            "CB0152E1D9F6E11EFDE54D1DC04B874C77FA1390",
-        )
-        self.assertEqual(contact_sync.parse_contact_fingerprint(ENC_INFO, "carol@example.com"), "")
-        self.assertEqual(contact_sync.parse_contact_fingerprint("No encryption.", "bob@example.net"), "")
-
     def test_relays(self):
         self.assertEqual(
             contact_sync.parse_relays(ENC_INFO),
@@ -103,6 +95,7 @@ class TestSyncClaim(unittest.TestCase):
             address="bob@example.net", auth_name="Bobby", name="", is_key_contact=True
         )
         self.bot.rpc.get_contact_encryption_info.return_value = ENC_INFO
+        self.bot.rpc.get_chat_securejoin_qr_code.return_value = ALICE_INVITE
 
     def tearDown(self):
         conn = database.get_connection()

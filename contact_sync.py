@@ -11,6 +11,7 @@ import re
 from typing import List, Optional
 
 import database
+import dc_fingerprint
 import identicon
 from dc_helpers import _is_private_chat
 
@@ -19,24 +20,6 @@ SYNC_INTERVAL_SECONDS = 3600
 
 # Contact ids up to this one are special (self, info, device...) in the core
 _LAST_SPECIAL_CONTACT_ID = 9
-
-
-def parse_contact_fingerprint(encryption_info: str, contact_addr: str) -> str:
-    """The contact's fingerprint from get_contact_encryption_info.
-
-    The text has a block per side, "Name (addr):" followed by the fingerprint as two lines
-    of five 4-hex groups; the bot's own block is there too. The block is picked by the
-    contact's address, so the bot's fingerprint is never mistaken for the contact's."""
-    if not encryption_info or not contact_addr:
-        return ""
-    lines = encryption_info.splitlines()
-    addr = contact_addr.strip().lower()
-    for i, line in enumerate(lines):
-        header = line.strip().lower()
-        if header.endswith(":") and (header.endswith(f"({addr}):") or header == f"{addr}:"):
-            fp = "".join(lines[i + 1 : i + 3]).replace(" ", "").upper()
-            return fp if re.fullmatch(r"[0-9A-F]{40}", fp) else ""
-    return ""
 
 
 def parse_relays(encryption_info: str) -> List[str]:
@@ -72,11 +55,11 @@ def sync_claim(bot, accid: int, claim: dict, contact_id: int) -> bool:
     if not contact or not getattr(contact, "is_key_contact", False):
         return False
     contact_addr = getattr(contact, "address", "")
-    encryption_info = bot.rpc.get_contact_encryption_info(accid, contact_id)
-    if parse_contact_fingerprint(encryption_info, contact_addr) != meta["fingerprint"]:
+    # Picked by key, not by address: core 2.66 no longer prints addresses next to fingerprints
+    if dc_fingerprint.get_contact_fingerprint(bot.rpc, accid, contact_id) != meta["fingerprint"]:
         bot.logger.debug(f"Contact sync: @{claim.get('username')} link key differs from contact {contact_id}, skipped")
         return False
-    relays = parse_relays(encryption_info)
+    relays = parse_relays(bot.rpc.get_contact_encryption_info(accid, contact_id))
 
     updated_link, changed = identicon.update_invite_link_contact_info(
         link,
