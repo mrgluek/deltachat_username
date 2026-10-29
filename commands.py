@@ -26,7 +26,7 @@ from formatting import (
     validate_invite_link,
 )
 
-VERSION = "1.17.0"
+VERSION = "1.18.0"
 
 dc_cli = BotCli("usernamebot")
 
@@ -178,10 +178,13 @@ def initadmin_command(bot, accid, event):
 
 
 def _send_username_card_reply(
-    bot, accid: int, chat_id: int, username: str, invite_link: str, updated_at: str, base_url: str
+    bot, accid: int, chat_id: int, username: str, claim: dict, base_url: str
 ):
     """Send visual WebP card image attachment accompanied by direct i.delta.chat invite link."""
-    metadata = identicon.parse_invite_metadata(invite_link, updated_at)
+    invite_link = claim["invite_link"]
+    linked_at = claim.get("linked_at") or ""
+    updated_at = claim.get("updated_at") or ""
+    metadata = identicon.parse_invite_metadata(invite_link, linked_at, updated_at)
     canonical_link = to_official_invite_link(metadata.get("canonical_link") or invite_link)
 
     caption = canonical_link
@@ -195,7 +198,7 @@ def _send_username_card_reply(
             MsgData(text=caption, file=card_file),
         )
     else:
-        card_text = format_username_card_text(username, invite_link, updated_at, base_url)
+        card_text = format_username_card_text(username, invite_link, linked_at, base_url, updated_at)
         _dc_send_msg_with_stats(bot, accid, chat_id, MsgData(text=card_text))
 
 
@@ -217,8 +220,7 @@ def username_command(bot, accid, event):
                 accid,
                 msg.chat_id,
                 uname,
-                current_claim["invite_link"],
-                current_claim.get("updated_at", ""),
+                current_claim,
                 base_url,
             )
         else:
@@ -251,8 +253,7 @@ def username_command(bot, accid, event):
             accid,
             msg.chat_id,
             target_username,
-            claim["invite_link"],
-            claim.get("updated_at", ""),
+            claim,
             base_url,
         )
     else:

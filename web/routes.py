@@ -254,7 +254,7 @@ def api_username_lookup(username: str, request: Request):
     if not claim or not claim.get("invite_link"):
         return JSONResponse({"error": "not_found"}, status_code=404)
 
-    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("linked_at") or "", claim.get("updated_at") or "")
     base_url = (database.get_config("base_url") or BASE_URL).rstrip("/")
     return {
         "username": clean_username,
@@ -311,7 +311,7 @@ def redirect_username(username: str, request: Request):
     if claim and claim.get("invite_link"):
         target_link = rewrite_invite_link(claim["invite_link"])
         base_url = get_request_base_url(request)
-        metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+        metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("linked_at") or "", claim.get("updated_at") or "")
 
         title_name = metadata.get("display_name") or clean_username
         og_title = f"{title_name} (@{clean_username}) • Delta Chat"
@@ -332,6 +332,8 @@ def redirect_username(username: str, request: Request):
             f"🛡️ {metadata.get('emoji_hash')} • "
             f"📅 Linked: {metadata.get('relative_time')}"
         )
+        if metadata.get("updated_time"):
+            og_desc += f" • 🔄 Updated: {metadata['updated_time']}"
         og_img = f"{base_url}/{clean_username}/og.png"
 
         # Everything below comes from the stored invite link, the URL path or request headers,
@@ -343,6 +345,9 @@ def redirect_username(username: str, request: Request):
         title_name = escape(title_name)
         username_html = escape(clean_username)
         relative_time = escape(metadata.get("relative_time") or "")
+        updated_html = (
+            f"<p>Updated {escape(metadata['updated_time'])}</p>" if metadata.get("updated_time") else ""
+        )
         emoji_hash = escape(metadata.get("emoji_hash") or "")
         fp_l1, fp_l2 = escape(fp_l1), escape(fp_l2)
 
@@ -418,6 +423,7 @@ def redirect_username(username: str, request: Request):
         <h1>{title_name}</h1>
         <p class="sub">@{username_html}</p>
         <p>Linked {relative_time}</p>
+        {updated_html}
         <div class="fp">{fp_l1}<br>{fp_l2}</div>
         <p style="font-size: 1.5rem; margin: 10px 0;">{emoji_hash}</p>
         {notice_html}
@@ -469,7 +475,7 @@ def get_username_og_png(username: str, request: Request):
         return Response(status_code=404)
 
     base_url = get_request_base_url(request)
-    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("linked_at") or "", claim.get("updated_at") or "")
     png_bytes = identicon.generate_og_png_bytes(clean_username, metadata, base_url=base_url)
     if not png_bytes:
         return Response(status_code=500)
@@ -490,7 +496,7 @@ def get_username_avatar_svg(username: str, request: Request):
         return Response(status_code=404)
 
     base_url = get_request_base_url(request)
-    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("linked_at") or "", claim.get("updated_at") or "")
     svg_text = identicon.generate_svg_card(clean_username, metadata, base_url=base_url)
 
     return Response(
@@ -517,9 +523,13 @@ def get_username_card_page(username: str, request: Request):
 
     base_url = get_request_base_url(request)
     target_link = rewrite_invite_link(claim["invite_link"])
-    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("updated_at", ""))
+    metadata = identicon.parse_invite_metadata(claim["invite_link"], claim.get("linked_at") or "", claim.get("updated_at") or "")
     qr_img = generate_qr_data_uri(target_link)
 
+    updated_badge = (
+        f'<span class="badge">Updated: {escape(metadata["updated_time"])}</span>'
+        if metadata.get("updated_time") else ""
+    )
     title_name = escape(metadata.get("display_name") or clean_username)
     line1, line2 = (escape(v) for v in metadata.get("formatted_fp", ("", "")))
     username_html = escape(clean_username)
@@ -572,6 +582,7 @@ def get_username_card_page(username: str, request: Request):
         <h1>{title_name}</h1>
         <div class="username">@{username_html}</div>
         <span class="badge">Linked: {escape(metadata.get('relative_time') or '')}</span>
+        {updated_badge}
 
         <div class="info-box">
             <div class="info-label">Email</div>

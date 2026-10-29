@@ -38,9 +38,17 @@ def init_db():
                     username TEXT PRIMARY KEY,
                     invite_link TEXT NOT NULL,
                     claimed_by_chat_id TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    linked_at TEXT
                 )
             ''')
+            # linked_at (v1.18.0) keeps the claim date: contact sync rewrites the link and bumps
+            # updated_at, which used to make the card show the sync time as "Linked".
+            # Older rows only have updated_at, so it is the best guess for their claim date.
+            columns = [r[1] for r in cursor.execute("PRAGMA table_info(usernames)")]
+            if "linked_at" not in columns:
+                cursor.execute("ALTER TABLE usernames ADD COLUMN linked_at TEXT")
+            cursor.execute("UPDATE usernames SET linked_at = updated_at WHERE linked_at IS NULL")
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_usernames_chat_id ON usernames(claimed_by_chat_id)')
 
             # Pending username state table
@@ -185,17 +193,26 @@ def claim_username(username: str, invite_link: str, chat_id: str) -> Dict[str, A
         conn = get_connection()
         try:
             cursor = conn.cursor()
+            # Re-linking the same name from the same chat only replaces the invite link,
+            # so the original claim date is kept; any other claim starts a new one
+            cursor.execute(
+                "SELECT linked_at FROM usernames WHERE username = ? AND claimed_by_chat_id = ?",
+                (clean_username, str_chat_id),
+            )
+            row = cursor.fetchone()
+            linked_at = (row[0] if row else None) or now_iso
             cursor.execute("DELETE FROM usernames WHERE claimed_by_chat_id = ?", (str_chat_id,))
             cursor.execute(
                 """
-                INSERT INTO usernames (username, invite_link, claimed_by_chat_id, updated_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO usernames (username, invite_link, claimed_by_chat_id, updated_at, linked_at)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(username) DO UPDATE SET
                     invite_link = excluded.invite_link,
                     claimed_by_chat_id = excluded.claimed_by_chat_id,
-                    updated_at = excluded.updated_at
+                    updated_at = excluded.updated_at,
+                    linked_at = excluded.linked_at
                 """,
-                (clean_username, invite_link, str_chat_id, now_iso),
+                (clean_username, invite_link, str_chat_id, now_iso, linked_at),
             )
             conn.commit()
         finally:
@@ -206,11 +223,12 @@ def claim_username(username: str, invite_link: str, chat_id: str) -> Dict[str, A
         "invite_link": invite_link,
         "claimed_by_chat_id": str_chat_id,
         "updated_at": now_iso,
+        "linked_at": linked_at,
     }
 
 
 def update_username_invite_metadata(username: str, new_invite_link: str) -> bool:
-    """Update invite link for an existing claimed username and refresh timestamp."""
+    """Update invite link for an existing claimed username and refresh updated_at (linked_at stays)."""
     clean_username = username.strip().lower()
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with _lock:
@@ -350,6 +368,7 @@ def get_all_usernames() -> Dict[str, Dict[str, Any]]:
                     "invite_link": r["invite_link"],
                     "claimed_by_chat_id": r["claimed_by_chat_id"],
                     "updated_at": r["updated_at"],
+                    "linked_at": r["linked_at"],
                 }
             return result
         finally:

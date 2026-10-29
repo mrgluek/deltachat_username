@@ -31,9 +31,11 @@ ARCANECHAT_ONLY_NOTE = (
 )
 
 
-def format_username_card_text(username: str, invite_link: str, updated_at_iso: str, base_url: str) -> str:
+def format_username_card_text(
+    username: str, invite_link: str, linked_at_iso: str, base_url: str, updated_at_iso: str = ""
+) -> str:
     """Generate rich verification card text with identicon, emoji badge, and formatted fingerprint."""
-    metadata = identicon.parse_invite_metadata(invite_link, updated_at_iso)
+    metadata = identicon.parse_invite_metadata(invite_link, linked_at_iso, updated_at_iso)
     raw_link = metadata["canonical_link"]
     if "/#" in raw_link:
         canonical_link = "https://i.delta.chat/#" + raw_link[raw_link.find("/#") + 2 :]
@@ -44,6 +46,8 @@ def format_username_card_text(username: str, invite_link: str, updated_at_iso: s
 
     if metadata.get("relative_time"):
         lines.append(f"📅 **Linked:** {metadata['relative_time']}")
+    if metadata.get("updated_time"):
+        lines.append(f"🔄 **Updated:** {metadata['updated_time']}")
 
     target_type = metadata.get("target_type", "contact")
     if target_type == "group":

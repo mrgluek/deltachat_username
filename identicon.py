@@ -196,7 +196,23 @@ def format_relative_time(iso_timestamp: str, now_dt: Optional[datetime] = None) 
         return iso_timestamp
 
 
-def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[str, Any]:
+def _parse_iso(iso_timestamp: str) -> Optional[datetime]:
+    try:
+        dt = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def format_updated_time(linked_at_iso: str, updated_at_iso: str) -> str:
+    """Relative update time, or "" when the claim was not changed after it was linked."""
+    linked_dt, updated_dt = _parse_iso(linked_at_iso), _parse_iso(updated_at_iso)
+    if not linked_dt or not updated_dt or (updated_dt - linked_dt).total_seconds() < 60:
+        return ""
+    return format_relative_time(updated_at_iso)
+
+
+def parse_invite_metadata(invite_link: str, linked_at_iso: str = "", updated_at_iso: str = "") -> Dict[str, Any]:
     """
     Parse Delta Chat invite link and return structured metadata:
     - fingerprint (40 hex string)
@@ -208,7 +224,8 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
       Delta Chat does not know `z` and would open a 1:1 chat with the inviter instead)
     - identicon (5x5 text identicon)
     - emoji_hash (5-emoji string)
-    - relative_time (formatted registration date)
+    - relative_time (formatted claim date)
+    - updated_time (formatted date of the last link change, "" if unchanged since the claim)
     - canonical_link (clean invite URL)
     """
     result: Dict[str, Any] = {
@@ -220,7 +237,8 @@ def parse_invite_metadata(invite_link: str, updated_at_iso: str = "") -> Dict[st
         "arcanechat_only": False,
         "identicon": "",
         "emoji_hash": "",
-        "relative_time": format_relative_time(updated_at_iso),
+        "relative_time": format_relative_time(linked_at_iso),
+        "updated_time": format_updated_time(linked_at_iso, updated_at_iso),
         "canonical_link": invite_link,
     }
 

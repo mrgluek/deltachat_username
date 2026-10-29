@@ -228,5 +228,29 @@ class TestIdenticon(unittest.TestCase):
         self.assertEqual(group_link, g_updated)
 
 
+class TestLinkedAndUpdatedTime(unittest.TestCase):
+    LINK = "https://i.delta.chat/#AABBCCDDEEFF00112233&v=3&i=t&s=s&a=a%40b.org&n=A"
+
+    def test_updated_time_only_after_a_change(self):
+        same = identicon.parse_invite_metadata(self.LINK, "2026-07-26T10:00:00Z", "2026-07-26T10:00:00Z")
+        self.assertTrue(same["relative_time"].startswith("26 Jul 2026"))
+        self.assertEqual(same["updated_time"], "")
+        self.assertEqual(identicon.parse_invite_metadata(self.LINK, "2026-07-26T10:00:00Z")["updated_time"], "")
+
+        synced = identicon.parse_invite_metadata(self.LINK, "2026-07-26T10:00:00Z", "2026-10-29T08:00:00Z")
+        self.assertTrue(synced["relative_time"].startswith("26 Jul 2026"))
+        self.assertTrue(synced["updated_time"].startswith("29 Oct 2026"))
+
+    def test_card_text_shows_both_dates(self):
+        import formatting
+        text = formatting.format_username_card_text(
+            "a", self.LINK, "2026-07-26T10:00:00Z", "https://deltachat.id", "2026-10-29T08:00:00Z"
+        )
+        self.assertIn("**Linked:** 26 Jul 2026", text)
+        self.assertIn("**Updated:** 29 Oct 2026", text)
+        plain = formatting.format_username_card_text("a", self.LINK, "2026-07-26T10:00:00Z", "https://deltachat.id")
+        self.assertNotIn("Updated", plain)
+
+
 if __name__ == "__main__":
     unittest.main()

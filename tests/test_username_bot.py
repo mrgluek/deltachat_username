@@ -270,6 +270,25 @@ class TestUsernameBot(unittest.TestCase):
         self.assertEqual(res_preview.status_code, 200)
         self.assertIn("Open in Delta Chat", res_preview.text)
 
+    def test_pages_show_linked_and_updated_dates(self):
+        link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
+        database.claim_username("gluek", link, "chat_100")
+        res = self.client.get("/gluek", headers={"User-Agent": "TelegramBot (like TwitterBot)"})
+        self.assertNotIn("Updated", res.text)
+
+        conn = database.get_connection()
+        conn.execute("UPDATE usernames SET linked_at = '2026-07-26T10:00:00Z' WHERE username = 'gluek'")
+        conn.commit()
+        conn.close()
+        database.update_username_invite_metadata("gluek", link.replace("chatmail.uk", "chat.gluek.info"))
+
+        res = self.client.get("/gluek", headers={"User-Agent": "TelegramBot (like TwitterBot)"})
+        self.assertIn("Linked: 26 Jul 2026", res.text)
+        self.assertIn("Updated:", res.text)
+        card = self.client.get("/gluek/card")
+        self.assertIn("Linked: 26 Jul 2026", card.text)
+        self.assertIn("Updated:", card.text)
+
     def test_dynamic_og_png_and_svg_endpoints(self):
         link = "https://i.delta.chat/#DFF2CAB1FEB7182F997C0A01466AA64DE33D8A39&v=3&i=1&s=2&a=gluek%40chatmail.uk&n=Gluek"
         database.claim_username("gluek", link, "chat_100")

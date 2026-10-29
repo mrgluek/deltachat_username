@@ -104,5 +104,54 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(res.get("status"), "ok")
 
 
+    def _set_times(self, username, linked_at, updated_at):
+        conn = database.get_connection()
+        conn.execute(
+            "UPDATE usernames SET linked_at = ?, updated_at = ? WHERE username = ?",
+            (linked_at, updated_at, username),
+        )
+        conn.commit()
+        conn.close()
+
+    def test_linked_at_survives_link_updates(self):
+        database.claim_username("alice", "https://i.delta.chat/#A&a=old", "10")
+        self._set_times("alice", "2026-07-26T10:00:00Z", "2026-07-26T10:00:00Z")
+
+        # Contact sync rewrites the link: only updated_at moves
+        database.update_username_invite_metadata("alice", "https://i.delta.chat/#A&a=new")
+        claim = database.get_username_claim("alice")
+        self.assertEqual(claim["linked_at"], "2026-07-26T10:00:00Z")
+        self.assertNotEqual(claim["updated_at"], "2026-07-26T10:00:00Z")
+
+        # The same chat re-linking the same name keeps the claim date
+        database.claim_username("alice", "https://i.delta.chat/#A&a=newer", "10")
+        self.assertEqual(database.get_username_claim("alice")["linked_at"], "2026-07-26T10:00:00Z")
+
+        # A new name, or the name taken over by another chat, starts a new claim
+        database.claim_username("alice2", "https://i.delta.chat/#A", "10")
+        self.assertNotEqual(database.get_username_claim("alice2")["linked_at"], "2026-07-26T10:00:00Z")
+        database.claim_username("bob", "https://i.delta.chat/#B", "20")
+        self._set_times("bob", "2026-07-26T10:00:00Z", "2026-07-26T10:00:00Z")
+        database.claim_username("bob", "https://i.delta.chat/#C", "30")
+        self.assertNotEqual(database.get_username_claim("bob")["linked_at"], "2026-07-26T10:00:00Z")
+
+    def test_linked_at_migration_from_updated_at(self):
+        # Pre-1.18 table without linked_at
+        conn = database.get_connection()
+        conn.execute("DROP TABLE usernames")
+        conn.execute(
+            "CREATE TABLE usernames (username TEXT PRIMARY KEY, invite_link TEXT NOT NULL, "
+            "claimed_by_chat_id TEXT NOT NULL, updated_at TEXT NOT NULL)"
+        )
+        conn.execute("INSERT INTO usernames VALUES ('old', 'https://i.delta.chat/#A', '1', '2026-08-01T00:00:00Z')")
+        conn.commit()
+        conn.close()
+
+        database.init_db()
+        database.init_db()  # idempotent
+        self.assertEqual(database.get_username_claim("old")["linked_at"], "2026-08-01T00:00:00Z")
+        self.assertEqual(database.get_all_usernames()["old"]["linked_at"], "2026-08-01T00:00:00Z")
+
+
 if __name__ == "__main__":
     unittest.main()
