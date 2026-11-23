@@ -5,6 +5,14 @@ All notable changes to the **Delta Chat Username Bot (`deltachat_username`)** wi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-11-23
+
+### Fixed
+- **Invite Tokens No Longer Pile Up in the Core**: Reading the bot's own key fingerprint asked the core for a new SecureJoin invite link every time, and each link creates a token that is never removed. This ran on every incoming message (contact sync of a claimed chat, admin check) and on every command; the production core database held 12,749 tokens and gained about 416 a day. The own fingerprint is now read once per account and kept for the process lifetime (a failed lookup is not cached). Measured with a fake core and 1,000 messages in a claimed chat: 2,000 invite-link requests before, 1 after.
+
+### Changed
+- **Admin Check on Messages**: The check run on every incoming message only exists to save the admin fingerprint after an email-only `/initadmin`; it now runs only while an admin email is set and no fingerprint is stored.
+
 ## [1.18.0] - 2026-10-29
 
 ### Fixed

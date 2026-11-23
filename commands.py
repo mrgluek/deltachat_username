@@ -26,7 +26,7 @@ from formatting import (
     validate_invite_link,
 )
 
-VERSION = "1.18.0"
+VERSION = "1.18.1"
 
 dc_cli = BotCli("usernamebot")
 
@@ -492,7 +492,10 @@ def on_new_message(bot, accid, event):
     except Exception as e:
         bot.logger.debug(f"Contact sync on message failed: {e}")
 
-    _is_dc_admin(bot, accid, msg.from_id)
+    # The only effect of the admin check here is saving the admin fingerprint once it becomes
+    # available after an email-only setup; skip it when there is nothing to upgrade.
+    if database.get_admin_email() and not database.get_admin_fingerprint():
+        _is_dc_admin(bot, accid, msg.from_id)
 
 
 @dc_cli.on(events.NewMessage(command="/url"))
