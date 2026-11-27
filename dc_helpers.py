@@ -11,6 +11,9 @@ import dc_fingerprint
 # Attachments over 64 KB are not downloaded automatically: the bot only reads commands
 DOWNLOAD_LIMIT = 65536
 
+# Messages and their files older than 24 hours are deleted from the local core storage
+DELETE_DEVICE_AFTER = 86400
+
 
 def configure_bot_profile(bot, accid: int):
     """Configure bot display name, status text, and avatar icon from environment or default files."""
@@ -76,6 +79,11 @@ def configure_bot_profile(bot, accid: int):
         bot.rpc.set_config(accid, "download_limit", str(DOWNLOAD_LIMIT))
     except Exception as e:
         bot.logger.warning(f"Failed to set download_limit: {e}")
+
+    try:
+        bot.rpc.set_config(accid, "delete_device_after", str(DELETE_DEVICE_AFTER))
+    except Exception as e:
+        bot.logger.warning(f"Failed to set delete_device_after: {e}")
 
 
 def is_group_chat(bot, accid: int, chat_id: int) -> bool:

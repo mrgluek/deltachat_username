@@ -5,6 +5,11 @@ All notable changes to the **Delta Chat Username Bot (`deltachat_username`)** wi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.2] - 2026-11-27
+
+### Changed
+- **Old Messages and Attachments Are Deleted**: The bot kept every attachment it ever received in group chats (2.1 GB on production). The core's local auto-delete (`delete_device_after`) is now set to 24 hours, so messages and their files older than that are removed from the bot's local storage. The bot keeps its own state in its own database and never reads old messages.
+
 ## [1.18.1] - 2026-11-23
 
 ### Fixed
